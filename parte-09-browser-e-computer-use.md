@@ -1,4 +1,4 @@
-# Parte 09: Browser e Computer Use
+# Parte 09: Navegador e Computer Use
 Todas as ferramentas desta série até agora foram baseadas em texto:
 
 - O terminal executa comandos e retorna texto.
@@ -6,9 +6,9 @@ Todas as ferramentas desta série até agora foram baseadas em texto:
 - A busca na web retorna texto.
 - Até mesmo o sistema de cron funciona com entrada e saída em texto.
 
-A automação de navegador e o uso de computador rompem esse padrão.
+A automação de navegador e o Computer Use rompem esse padrão.
 
-A ferramenta de navegador navega em sites reais, clica em botões, preenche formulários e interage com páginas web. A ferramenta de uso de computador controla uma área de trabalho real, clicando, digitando, rolando e arrastando em sistemas macOS, Windows e Linux.
+A ferramenta de navegador navega em sites reais, clica em botões, preenche formulários e interage com páginas web. A ferramenta de Computer Use controla uma área de trabalho real, clicando, digitando, rolando e arrastando em sistemas macOS, Windows e Linux.
 
 O cursor do usuário não se move, o foco da janela não muda e o agente trabalha ao lado do usuário na mesma máquina.
 
@@ -44,17 +44,17 @@ Por exemplo:
 
 Cinco backends atendem a diferentes casos de uso.
 
-### Browserbase
+### Navegadorbase
 
-O modo em nuvem do Browserbase oferece navegadores gerenciados com:
+O modo em nuvem do Navegadorbase oferece navegadores gerenciados com:
 
 - Proxies residenciais;
 - Resolução de CAPTCHA;
 - Recursos adequados para sites que combatem automações e bots.
 
-### Browser Use
+### Navegador Use
 
-O Browser Use funciona como um provedor de nuvem alternativo, com recursos próprios de automação e antidetecção.
+O Navegador Use funciona como um provedor de nuvem alternativo, com recursos próprios de automação e antidetecção.
 
 ### Firecrawl
 
@@ -66,7 +66,7 @@ O modo Chromium local via **Chrome DevTools Protocol — CDP** conecta o Hermes 
 
 ### Chromium local padrão
 
-O modo local padrão utiliza uma instalação do Chromium controlada pela CLI `agent-browser`.
+O modo local padrão utiliza uma instalação do Chromium controlada pela CLI `agent-Navegador`.
 
 ---
 
@@ -129,9 +129,9 @@ Esse tipo de interação era impossível para agentes limitados exclusivamente a
 
 ---
 
-# Uso de computador
+# Computer Use
 
-O uso de computador estende o mesmo princípio para toda a área de trabalho.
+O computer use estende o mesmo princípio para toda a área de trabalho.
 
 O agente pode capturar qualquer janela visível como uma screenshot, adicionando sobreposições numeradas sobre os elementos interativos.
 
@@ -185,7 +185,7 @@ Isso permite que múltiplos agentes trabalhem simultaneamente sem produzir compo
 
 ## Compatibilidade com modelos
 
-O uso de computador funciona com qualquer modelo capaz de utilizar ferramentas, incluindo:
+O Computer Use funciona com qualquer modelo capaz de utilizar ferramentas, incluindo:
 
 - Claude;
 - GPT;
@@ -201,9 +201,9 @@ O `cua-driver` é um driver de código aberto executado em segundo plano, respon
 
 ---
 
-# Navegador versus uso de computador
+# Navegador versus Computer Use
 
-A automação de navegador e o uso de computador possuem capacidades semelhantes, mas atendem a propósitos diferentes.
+A automação de navegador e o Computer Use possuem capacidades semelhantes, mas atendem a propósitos diferentes.
 
 ## Automação de navegador
 
@@ -218,9 +218,9 @@ Características:
 - Limpa automaticamente a sessão após um período de inatividade;
 - É indicada para tarefas exclusivamente web.
 
-## Uso de computador
+## Computer Use
 
-O uso de computador opera diretamente sobre a área de trabalho real.
+O Computer Use opera diretamente sobre a área de trabalho real.
 
 O agente pode:
 
@@ -253,7 +253,7 @@ Ele tende a ser:
 - Mais previsível;
 - Independente de permissões específicas da plataforma.
 
-Para tarefas nativas de área de trabalho, especialmente aquelas que envolvem aplicações sem interface web, utilize o uso de computador.
+Para tarefas nativas de área de trabalho, especialmente aquelas que envolvem aplicações sem interface web, utilize o Computer Use.
 
 ---
 
@@ -272,9 +272,9 @@ As principais limitações são:
 - As sessões expiram conforme o plano do provedor;
 - Alguns sites podem limitar ou bloquear automações.
 
-## Segurança do uso de computador
+## Segurança do Computer Use
 
-O uso de computador possui um modelo de segurança mais abrangente.
+O Computer Use possui um modelo de segurança mais abrangente.
 
 Toda captura que apresenta um diálogo de permissão é sinalizada.
 
@@ -405,7 +405,7 @@ A automação de navegador permite que o agente interaja com praticamente qualqu
 - Dependem de interfaces dinâmicas;
 - Tentam detectar ou bloquear bots.
 
-O uso de computador permite que o agente interaja com praticamente qualquer aplicação na área de trabalho, inclusive aquelas que:
+O Computer Use permite que o agente interaja com praticamente qualquer aplicação na área de trabalho, inclusive aquelas que:
 
 - Não possuem API;
 - Não possuem versão web;
