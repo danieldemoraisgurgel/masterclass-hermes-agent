@@ -296,7 +296,7 @@ Uma chave de API ausente ou um backend mal configurado poderá frustrá-lo por s
 
 O orçamento de iterações existe por um motivo.
 
-O padrão é de **90 turnos**.
+O padrão é de **150 turnos**.
 
 Cada chamada de ferramenta conta como um turno.
 
