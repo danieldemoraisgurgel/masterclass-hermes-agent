@@ -436,7 +436,7 @@ Quando o gateway reinicia após uma atualização, ele envia uma notificação �
 
 ## O Gateway e o Ciclo de Aprendizagem
 
-O ciclo de aprendizagem apresentado no Artigo 3 só se acumula se o agente estiver acessível.
+O ciclo de aprendizagem apresentado no 'Parte 3' só se acumula se o agente estiver acessível.
 
 Uma skill de escrita criada pelo agente tem pouca utilidade se ela só puder ser utilizada em um terminal diante do qual você não está sentado.
 
