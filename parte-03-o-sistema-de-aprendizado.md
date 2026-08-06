@@ -1,450 +1,212 @@
-# Parte 03: O Sistema de Aprendizado
+# Parte 03: O sistema de aprendizado
 
-Os dois primeiros artigos abordaram o **motor** — o loop do agente — e o **chassi** — implantação e configuração.
+Depois de entender o loop do agente e a base de implantação, vem a pergunta mais importante de todas:
 
-O motor dispara. O chassi é estável.
+isso melhora com o tempo ou não?
 
-Agora a pergunta é:
+Na maioria das ferramentas de IA, a resposta honesta é “quase não”. O modelo até pode receber uma atualização do fornecedor, mas a ferramenta em si não vai aprendendo com você.
 
-> Ele realmente melhora com o tempo?
+No Hermes, a proposta é diferente.
 
-Essa não é uma pergunta retórica.
+Ele não treina o modelo com seus dados. O que ele faz é construir um sistema em volta do modelo para acumular contexto útil sobre:
 
-A maioria das ferramentas de IA é lançada com um nível fixo de capacidade e permanece assim. O ChatGPT de hoje sabe aproximadamente o que sabia na semana passada. O Claude Code é o mesmo Claude Code que era no dia da instalação.
+- você;
+- seus projetos;
+- seu ambiente;
+- seus fluxos de trabalho.
 
-O fornecedor do modelo pode lançar uma atualização, mas a ferramenta em si não aprende com seu trabalho.
-
-O **Agente Hermes aprende**.
-
-Não porque o modelo treina com seus dados, mas por causa de três sistemas que trabalham juntos para acumular, formalizar e manter o que o agente aprende sobre:
-
-- Você;
-- Seus projetos;
-- Seus fluxos de trabalho.
-
----
+É isso que transforma uso repetido em vantagem real.
 
 ## Memória: um conjunto selecionado de fatos
 
-A memória no Hermes não é um registro de tudo que aconteceu.
+A memória do Hermes não é um diário completo da sua vida nem um dump da sessão anterior.
 
-É um conjunto pequeno e selecionado de fatos que o agente mantém em contexto o tempo todo.
+Ela funciona mais como um bloco pequeno de fatos que vale a pena manter sempre por perto. Coisas do tipo:
 
-O sistema mantém dois arquivos:
+- preferências de resposta;
+- convenções do projeto;
+- detalhes do ambiente;
+- correções recorrentes feitas por você.
 
-- `MEMORY.md`: contém as anotações pessoais do agente, como fatos do ambiente, convenções do projeto, peculiaridades de ferramentas e trabalho concluído.
-- `USER.md`: contém seu perfil, como preferências, estilo de comunicação, nível técnico e coisas que o irritam.
+Em geral, o sistema separa isso em dois espaços:
 
-Juntos, eles são limitados a aproximadamente **1.300 tokens**.
+- `MEMORY.md`, com notas do ambiente e do trabalho;
+- `USER.md`, com informações duráveis sobre você e seu jeito de trabalhar.
 
-Isso é intencionalmente restrito.
+A limitação de tamanho não é um defeito. É uma proteção. Memória boa é memória selecionada.
 
 ### Como a memória se comporta
 
-O agente grava na memória automaticamente quando aprende algo duradouro.
+Quando o Hermes aprende algo que tende a continuar valendo, ele pode salvar aquilo.
 
-Você o corrige sobre uma convenção?
+Por exemplo:
 
-Ele salva isso.
+- você prefere respostas curtas e diretas;
+- determinado projeto usa uma convenção específica;
+- um workflow sempre falha por um detalhe conhecido;
+- certo diretório é o lugar certo para guardar saídas temporárias.
 
-Ele descobre que seu projeto usa Go 1.22 e `sqlc`?
-
-Ele salva isso.
-
-Você pede que ele se lembre da sua programação de rotação de chave de API?
-
-Ele salva isso.
-
-A memória é um instantâneo congelado no início da sessão.
-
-Tudo de que o agente se lembra é carregado em seu prompt de sistema como um bloco de texto, disponível imediatamente a partir da primeira mensagem.
-
----
+Esse bloco entra no contexto logo no começo de novas sessões. É isso que evita ter de reexplicar as mesmas coisas toda hora.
 
 ## Persistência e atualização da memória
 
-Alterações de memória realizadas no meio da sessão são persistidas no disco, mas não aparecem no prompt até a próxima sessão.
+Uma nuance importante: a memória pode ser atualizada no meio da sessão, mas o efeito completo costuma aparecer na próxima. Isso mantém o contexto mais estável e evita bagunçar o prefixo do prompt a cada pequena mudança.
 
-Isso mantém o prefixo do prompt estável para o cache do lado do provedor.
+Quando a memória enche, o Hermes não deveria sair apagando fatos aleatoriamente. O comportamento esperado é consolidar:
 
-Quando a memória fica cheia — e, aos **2.200 caracteres para o `MEMORY.md`**, ela ficará — o agente não descarta entradas silenciosamente.
+1. encurtar entradas redundantes;
+2. remover o que ficou obsoleto;
+3. abrir espaço para o que ainda importa.
 
-A ferramenta retorna um erro contendo:
-
-- As entradas atuais;
-- A contagem de uso.
-
-O agente então consolida a memória:
-
-1. Mescla entradas relacionadas em outras mais curtas;
-2. Remove fatos obsoletos;
-3. Abre espaço para as novas informações.
-
-A mensagem de erro mostra exatamente o que está na memória, permitindo que o agente decida o que deve manter e o que deve remover.
-
-A memória custa tokens em cada prompt. Por isso, o agente precisa decidir se um fato é importante o suficiente para armazenamento permanente.
-
----
+Isso é importante porque memória custa tokens em todo turno. Se você guardar qualquer coisa, a conta cresce e a qualidade cai.
 
 ## Memória versus busca de sessões
 
-A busca de sessão não custa nada até que você execute uma consulta.
+Nem tudo que o agente precisa lembrar merece memória permanente.
 
-O agente usa a busca de sessão para recuperação de informações, por exemplo:
+Sessões antigas existem justamente para isso.
 
-> O que aprendi sobre o projeto X na semana passada?
+Quando a pergunta é algo como:
 
-Na memória permanente, ele salva apenas aquilo que deveria estar sempre em contexto.
+> o que decidimos sobre aquele projeto semana passada?
 
-A distinção central é:
+não faz sentido carregar essa informação em todo prompt para sempre. Faz mais sentido buscar quando necessário.
 
-> **A memória armazena fatos. As habilidades armazenam procedimentos.**
+Daí a divisão útil:
 
----
+- memória guarda fatos duráveis;
+- sessões guardam histórico recuperável.
+
+Essa distinção parece técnica, mas muda bastante a qualidade do sistema.
 
 ## Habilidades: a memória procedimental do agente
 
-Quando o agente resolve um problema novo em um fluxo de trabalho de múltiplas etapas, ele pode salvar a abordagem como uma habilidade.
+Se memória guarda fatos, skills guardam procedimento.
 
-Isso pode acontecer quando a tarefa envolve:
+Quando o Hermes resolve uma tarefa mais complexa e percebe que aquilo pode voltar, ele pode transformar a abordagem em uma skill. Normalmente isso faz sentido quando houve:
 
-- Cinco ou mais chamadas de ferramentas;
-- Troca significativa de mensagens;
-- Uma correção feita pelo usuário;
-- Um procedimento que provavelmente será reutilizado.
+- várias chamadas de ferramenta;
+- tentativa e erro real;
+- uma correção importante do usuário;
+- um fluxo que claramente vai se repetir.
 
-A habilidade se torna um arquivo Markdown armazenado em:
-
-```text
-~/.hermes/skills/
-```
-
-Esse arquivo contém:
-
-- Nome;
-- Descrição;
-- Procedimento passo a passo;
-- Seção de armadilhas;
-- Etapas de verificação.
-
----
+A skill vira um arquivo Markdown com instruções executáveis. Não é só documentação bonita. É um jeito de formalizar trabalho que já provou funcionar.
 
 ## Divulgação progressiva das habilidades
 
-As habilidades usam divulgação progressiva para minimizar a sobrecarga de tokens.
+Aqui existe uma sacada boa de arquitetura.
 
-No início da sessão, apenas o índice de habilidades é carregado.
+O Hermes não carrega todas as skills completas em toda sessão. Primeiro ele carrega só um índice enxuto com nome, descrição e categoria. O conteúdo completo entra apenas quando necessário.
 
-Esse índice contém uma lista compacta de:
-
-- Nomes;
-- Descrições;
-- Categorias.
-
-O agente carrega o conteúdo completo de uma habilidade somente quando realmente precisa dela:
-
-```text
-skill_view(name)
-```
-
-Para carregar arquivos de apoio, como modelos ou scripts:
-
-```text
-skill_view(name, path)
-```
-
-A maioria das habilidades nunca é carregada na maioria das sessões.
-
-O custo de tokens é, portanto, limitado principalmente ao índice.
-
----
+Isso reduz custo e evita encher o contexto com procedimento que provavelmente não será usado.
 
 ## Combinação de habilidades
 
-Várias habilidades podem ser combinadas em um único comando.
+Outra vantagem é que skills podem ser compostas.
 
-Exemplo:
-
-```text
-/github-pr-workflow /test-driven-development fix issue #123
-```
-
-Nesse caso, o Hermes carrega ambas as habilidades no contexto e segue os dois conjuntos de instruções durante a execução da mesma tarefa.
-
-Para fluxos de trabalho repetitivos, pacotes de habilidades permitem agrupar várias habilidades sob um único comando de barra.
-
----
+Você pode combinar, por exemplo, uma skill de fluxo GitHub com outra de testes. O agente passa a trabalhar com as duas lentes ao mesmo tempo, o que é muito mais útil do que tentar enfiar tudo numa única skill gigante e genérica.
 
 ## Origem das habilidades
 
-As habilidades vêm de três lugares.
+As skills costumam vir de três lugares.
 
 ### 1. Habilidades incluídas
 
-Acompanham o Hermes e cobrem fluxos de trabalho comuns, como:
-
-- Revisão de código;
-- Gerenciamento de pull requests;
-- Pesquisa.
+São as que já acompanham o Hermes. Elas cobrem operações comuns e ajudam bastante no começo.
 
 ### 2. Habilidades do Hub
 
-São contribuídas pela comunidade e podem ser instaladas a partir do **Skills Hub**.
+São contribuições externas instaláveis. Entram bem quando você quer ampliar a biblioteca sem partir do zero.
 
 ### 3. Habilidades criadas pelo agente
 
-São habilidades que o próprio agente escreve.
+Essas são as mais interessantes no longo prazo, porque capturam o seu jeito de trabalhar. É aqui que o Hermes começa a ficar menos genérico e mais seu.
 
-Elas funcionam como a memória procedimental dos seus padrões específicos de trabalho.
+# A revisão em segundo plano é uma infraestrutura invisível
 
----
+O aprendizado do Hermes não depende só do que acontece na conversa principal.
 
-# A Revisão em Segundo Plano é uma Infraestrutura Invisível
+Depois de um turno, ele pode fazer uma revisão paralela do que aconteceu para identificar se existe algo que vale transformar em memória ou skill.
 
-Memória e habilidades não apenas se acumulam passivamente.
+Essa revisão é valiosa porque separa duas tarefas diferentes:
 
-Após cada turno de conversa, o Hermes cria uma bifurcação de revisão em segundo plano que examina o que aconteceu.
+- resolver o problema agora;
+- decidir o que merece ser preservado depois.
 
-A bifurcação é executada como um agente de IA separado, usando seu próprio cache de prompt.
-
-Ela nunca interfere na conversa ativa.
-
-Esse agente de revisão procura elementos que valha a pena lembrar, como:
-
-- Correções feitas por você;
-- Fluxos de trabalho executados;
-- Fatos sobre seu ambiente;
-- Procedimentos que foram refinados.
-
-Quando encontra algo relevante, ele pode propor:
-
-- Uma gravação de memória;
-- Um patch de habilidade.
-
-Essa é a parte do sistema que faz o ciclo de aprendizado parecer mágico.
-
-Você corrige o agente uma vez sobre como seu projeto está estruturado.
-
-A revisão em segundo plano captura a correção e a salva na memória.
-
-Na próxima sessão, o agente já possui esse fato em contexto desde a primeira mensagem.
-
-Você não precisa informá-lo novamente.
-
----
+Misturar as duas coisas no mesmo fluxo deixaria a conversa mais lenta e mais barulhenta.
 
 ## Aprovação das gravações
 
-O mecanismo de aprovação permite controlar o que o Hermes aprende e persiste.
+Em geral, o que faz mais sentido guardar sem pedir permissão explícita são fatos pequenos e duráveis, como preferência de linguagem ou detalhe estável do ambiente.
 
-Com as seguintes configurações:
-
-```yaml
-memory.write_approval: true
-skills.write_approval: true
-```
-
-Toda proposta gerada pela revisão em segundo plano é preparada, mas não confirmada automaticamente.
-
-Você pode revisar as propostas de memória com:
-
-```text
-/memory pending
-```
-
-E revisar as propostas de habilidades com:
-
-```text
-/skills pending
-```
-
-Depois, você pode:
-
-- Aprovar as propostas corretas;
-- Rejeitar as propostas incorretas;
-- Auditar exatamente o que o agente pretende aprender.
-
-Essa funcionalidade atua como uma válvula de segurança para ambientes em que é necessário controlar e auditar o aprendizado do agente.
-
----
+Já mudanças mais estruturais, como criar uma nova skill, costumam merecer confirmação. Isso evita transformar qualquer sucesso ocasional em regra permanente.
 
 ## Uso de um modelo mais barato para revisão
 
-A revisão em segundo plano também pode ser executada por um modelo mais barato.
+Essa parte também abre espaço para otimização.
 
-Por padrão, ela utiliza o modelo principal de chat.
+Nem toda tarefa de revisão precisa usar o modelo mais caro. Muitas vezes um modelo menor já dá conta de inspecionar o turno e sugerir o que vale preservar. Isso reduz custo sem derrubar valor.
 
-Como a conversa já está aquecida no cache de prompt, essas operações podem funcionar como leituras de cache efetivamente gratuitas.
+# O curador impede a degradação das habilidades
 
-Caso você esteja usando um modelo caro, pode direcionar a revisão para um modelo menor, sem diferença significativa de qualidade.
+Criar skill é só metade do problema. A outra metade é impedir que a biblioteca apodreça.
 
-Em benchmarks:
-
-- A captura de memória foi idêntica;
-- A captura de habilidades foi quase idêntica.
-
----
-
-# O Curador Impede a Degradação das Habilidades
-
-O curador funciona como o coletor de lixo das habilidades.
-
-Ele é executado por um agendador:
-
-- A cada sete dias, por padrão;
-- Quando o agente está ocioso há pelo menos duas horas.
-
----
+Sem manutenção, skills viram uma coleção de instruções antigas, redundantes ou meio certas. E uma skill meio certa é pior do que nenhuma, porque dá falsa confiança.
 
 ## Ciclo de vida das habilidades
 
-A fase determinística move as habilidades por um ciclo de vida.
+O curador existe para revisar, consolidar e podar a biblioteca.
 
 ### Habilidade não utilizada por 30 dias
 
-Torna-se obsoleta.
+Esse costuma ser um bom momento para perguntar se ela ainda faz sentido ou se foi só um workaround pontual.
 
 ### Habilidade não utilizada por 90 dias
 
-É arquivada em:
-
-```text
-~/.hermes/skills/.archive/
-```
-
-Nada é apagado permanentemente.
-
-O arquivamento pode ser revertido com:
-
-```bash
-hermes curator restore <name>
-```
-
----
+Aqui já vale considerar arquivar, fundir com outra ou remover, se não houver motivo real para mantê-la viva.
 
 ## Consolidação opcional com LLM
 
-A fase opcional de LLM executa uma revisão usando um modelo auxiliar.
-
-O agente bifurcado examina a biblioteca de habilidades e pode:
-
-- Identificar habilidades sobrepostas;
-- Propor habilidades mais abrangentes;
-- Consolidar habilidades muito específicas;
-- Corrigir divergências entre procedimentos.
-
-Essa fase fica desativada por padrão porque consome tokens.
-
-Para habilitá-la permanentemente:
-
-```yaml
-curator.consolidate: true
-```
-
-Para executá-la sob demanda:
-
-```bash
-hermes curator run --consolidate
-```
-
----
+Quando várias skills começam a se sobrepor, um processo de consolidação ajuda a reduzir ruído. O objetivo não é deixar tudo uniforme por estética. É facilitar descoberta e evitar duplicação desnecessária.
 
 ## Proteção de habilidades críticas
 
-Habilidades críticas podem ser fixadas com:
-
-```bash
-hermes curator pin <name>
-```
-
-Fixar uma habilidade impede:
-
-- Transições automáticas;
-- Arquivamento;
-- Exclusão.
-
-Patches e edições ainda podem ser aplicados.
-
-Isso significa que o agente pode melhorar o conteúdo de uma habilidade fixada ao longo do tempo, mas a habilidade em si nunca será removida automaticamente.
-
----
+Nem tudo deve ficar sujeito a poda automática. Algumas skills viram infraestrutura do seu jeito de operar e precisam de proteção extra.
 
 ## Instantâneos e rollback
 
-Antes de cada execução do curador, um instantâneo em formato `tar.gz` de todo o diretório de habilidades é salvo.
+Se você vai deixar o sistema mexer em skills, snapshot e rollback deixam de ser luxo e viram requisito. Sem isso, uma "limpeza" ruim pode custar conhecimento útil.
 
-Qualquer execução pode ser revertida com:
+# Como o ciclo de aprendizado funciona
 
-```bash
-hermes curator rollback
-```
+Se você juntar todas as peças, o ciclo fica assim:
 
-A própria reversão também é reversível.
+1. você trabalha com o agente;
+2. o Hermes usa ferramentas e resolve a tarefa;
+3. a sessão é salva;
+4. uma revisão identifica o que foi aprendido;
+5. fatos duráveis podem virar memória;
+6. procedimentos reutilizáveis podem virar skill;
+7. sessões futuras passam a começar mais fortes.
 
----
+É esse acúmulo que faz o sistema melhorar no uso real.
 
-# Como o Ciclo de Aprendizado Funciona
+# Por que a persistência das sessões importa
 
-Memória e habilidades são injetadas no prompt de maneiras diferentes:
+Sem sessão persistente, o aprendizado perde profundidade.
 
-- A memória é carregada no nível volátil, congelada durante a sessão;
-- As habilidades são carregadas no nível estável, sempre presentes como um índice.
+Memória sozinha não resolve tudo. Skill sozinha também não. O histórico de sessões é o que permite ao agente revisitar decisões, recuperar contexto e conectar trabalhos espalhados no tempo.
 
-O agente pode consultar ambas durante a execução.
+Quando essa base falha, o Hermes até continua conversando, mas deixa de acumular.
 
-Quando encontra um problema, ele:
+# O sistema de aprendizado é o produto
 
-1. Verifica a memória em busca de fatos relevantes;
-2. Identifica as habilidades correspondentes;
-3. Carrega o conteúdo completo das habilidades necessárias;
-4. Executa o procedimento;
-5. Chama as ferramentas necessárias;
-6. Retorna os resultados para a conversa.
+Esse ponto é central.
 
-Depois disso, a revisão em segundo plano examina o turno e identifica o que funcionou.
+Muita gente olha para o Hermes e enxerga modelo, terminal ou automação. Tudo isso importa, mas o que realmente diferencia o sistema é a capacidade de aprender estrutura com o uso.
 
-Ela pode salvar:
+Memória captura o que vale carregar.
+Skills capturam o que vale repetir.
+Sessões capturam o caminho que levou até ali.
 
-- Uma nova entrada de memória para um fato descoberto;
-- Um patch de habilidade para um procedimento refinado;
-- Uma nova habilidade para um fluxo de trabalho reutilizável.
-
-Ao longo de várias sessões, o ciclo se repete.
-
-A memória é consolidada à medida que fica cheia.
-
-As habilidades são curadas à medida que envelhecem.
-
-O curador remove ou arquiva aquilo que deixou de ser útil.
-
-Como resultado, o agente passa a trabalhar com menos entradas, porém com entradas melhores.
-
----
-
-# Por Que a Persistência das Sessões Importa
-
-É por isso que as decisões de implantação e sessão apresentadas na Parte 2 desta Master Class são importantes.
-
-O ciclo de aprendizado só funciona se as sessões persistirem.
-
-Quando cada conversa começa do zero, sem memória, habilidades ou contexto persistente, o agente não consegue acumular aprendizado.
-
-Ele aprende durante a sessão, esquece após a reinicialização e nunca melhora de forma contínua.
-
----
-
-# O Sistema de Aprendizado é o Produto
-
-O sistema de aprendizado é o produto.
-
-O loop do agente é o motor que o executa.
-
-Sem o sistema de aprendizado, você tem apenas um chatbot com acesso a ferramentas.
-
-Com ele, você tem algo que realmente melhora no seu trabalho, na sua máquina e ao longo do tempo.
-
-> **A memória captura o quê.**
-
-> **As habilidades codificam o como.**
-
-Ambas permanecem estáticas até que você ou o agente as criem.
+Quando essas três camadas funcionam juntas, o Hermes deixa de ser só uma interface esperta e vira um sistema que melhora no seu contexto.

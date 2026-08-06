@@ -1,337 +1,222 @@
-# Parte 01: Como o Agente Hermes Realmente Processa o Trabalho
+# Parte 01: Como o agente Hermes realmente processa o trabalho
 
-Todo chatbot de IA que você já usou tem a mesma arquitetura: você digita uma mensagem, o modelo gera uma resposta.
+Quase todo chatbot de IA funciona do mesmo jeito: você manda uma mensagem, o modelo responde, fim.
 
-Uma etapa. Pronto.
+Com o Hermes, a história é outra.
 
-O Hermes é diferente de uma forma que não fica óbvia nas capturas de tela.
+Quando você pede alguma coisa, ele não sai cuspindo texto imediatamente. Antes disso, ele monta contexto, escolhe provedor, decide se precisa compactar histórico, chama ferramentas, avalia o que voltou e só então responde. Em muitos casos, uma única tarefa passa por várias rodadas desse ciclo.
 
-Quando você envia uma mensagem, ele passa por um processo estruturado — montagem de prompt, resolução de provedor, chamada de API, despacho de ferramentas, avaliação de resultado e persistência de contexto — antes de responder.
-
-Algumas mensagens acionam dez chamadas de ferramentas, cada uma alimentando o modelo para outra rodada de raciocínio. Então a sessão é salva, a memória é gravada, e tudo fica pronto para ser retomado mais tarde.
-
-Isso é um **loop de agente**.
-
-Entender como ele funciona é a chave para compreender por que essa ferramenta se acumula de formas que chatbots básicos não conseguem.
-
-Veja o que acontece nos bastidores toda vez que você envia uma mensagem.
+É isso que faz o Hermes parecer menos um chat e mais um agente de verdade.
 
 ## Chatbots têm uma arquitetura simples
 
+No modelo mais básico, o fluxo é assim:
+
 ```text
-mensagem do usuário -> modelo prevê -> resposta
+mensagem do usuário -> modelo prevê a próxima sequência -> resposta
 ```
 
-Cada entrada é uma nova inferência sobre dados estáticos de treinamento.
+Isso resolve conversa. Não resolve execução.
 
-O modelo não executa nada. Ele não verifica nada. Ele faz suposições com base no que aprendeu durante o treinamento.
+O modelo não verifica se um arquivo existe. Não abre um terminal. Não consulta uma API. Não volta para conferir se a primeira tentativa deu errado. Ele só prevê texto.
+
+Por isso tanta ferramenta de IA parece impressionante nos primeiros cinco minutos e limitada no uso real.
 
 ## O Hermes tem um loop
 
-A classe `AIAgent`, localizada em `run_agent.py`, trata todo o ciclo de vida de um único turno:
+O Hermes funciona em ciclos.
 
-- montagem de prompt;
-- seleção de provedor;
-- chamada de API;
-- despacho de ferramentas;
-- compressão;
-- fallback;
-- persistência.
+Cada turno passa, mais ou menos, por esta sequência:
 
-Ele oferece suporte a três modos de execução de API:
+1. montar o prompt com instruções, memória e contexto atual;
+2. resolver qual modelo e qual provedor serão usados;
+3. comprimir histórico, se necessário;
+4. chamar o modelo;
+5. interpretar a resposta;
+6. executar ferramentas, quando o modelo pedir;
+7. alimentar o resultado de volta no loop;
+8. repetir até chegar a uma resposta final.
 
-1. conclusões de chat da OpenAI;
-2. OpenAI Codex/Responses;
-3. Messages nativo da Anthropic.
-
-Todos eles convergem para o mesmo formato interno de mensagem.
+Na prática, isso significa que uma tarefa pode envolver várias idas e voltas entre raciocínio e execução. É essa alternância que dá ao Hermes uma sensação de continuidade e trabalho real.
 
 ## O que acontece em cada mensagem
 
 ### 1. Montagem de prompt
 
-O sistema constrói o contexto a partir de mais de dez camadas:
+Antes de responder, o Hermes junta as peças que precisa para pensar direito.
 
-- `SOUL.md`, para identidade;
-- habilidades, para conhecimento procedimental;
-- instantâneos de memória;
+Esse pacote costuma incluir:
+
+- instruções de sistema;
+- memória permanente;
 - perfil do usuário;
-- arquivos de contexto do diretório do projeto;
-- dicas da plataforma de onde você está conversando.
+- mensagens recentes da sessão;
+- índice de skills;
+- contexto do projeto, quando existe;
+- resultados de ferramentas já usados no turno.
 
-Tudo é montado em três níveis ordenados:
-
-- **Estável:** identidade, ferramentas e habilidades;
-- **Contexto:** arquivos do projeto;
-- **Volátil:** memória, perfil e carimbo de data e hora.
+Essa etapa importa mais do que parece. Um agente bom não depende só do modelo; depende de como o contexto é montado.
 
 ### 2. Resolução de provedor
 
-O Hermes mapeia a seleção de provedor e modelo para:
+O Hermes também precisa decidir quem vai executar o turno.
 
-- endpoint de API;
-- chave de API;
-- modo correto de execução.
+Dependendo da configuração, isso pode envolver:
 
-Ele trata mais de 18 provedores, fluxos de OAuth e pools de credenciais.
+- escolher o modelo principal;
+- aplicar fallback para outro provedor;
+- usar um modelo diferente em tarefas auxiliares;
+- respeitar regras do perfil ativo.
+
+Isso separa o “pensar” da infraestrutura de inferência. Você consegue trocar o motor sem reescrever a máquina inteira.
 
 ### 3. Compressão prévia
 
-Se a conversa ultrapassa 50% da janela de contexto do modelo, o Hermes comprime o histórico antes de fazer a chamada de API.
+Se o histórico crescer demais, o Hermes não segue empilhando mensagem até quebrar.
 
-Nesse processo:
+Ele compacta o que ficou para trás, preserva o que ainda importa e continua a sessão em uma nova linhagem. Não é perfeito, porque resumo nunca substitui o original, mas é muito melhor do que simplesmente explodir a janela de contexto.
 
-- os turnos intermediários são resumidos;
-- as últimas 20 mensagens são preservadas intactas;
-- um novo ID de linhagem da sessão é gerado.
+Em uso real, isso faz diferença. Sessões longas acontecem. Sem compressão, elas morrem cedo.
 
 ### 4. Chamada de API
 
-O contexto montado é enviado ao modelo.
+Com o prompt pronto, o Hermes chama o modelo.
 
-A solicitação HTTP é executada em uma thread em segundo plano, com um evento de interrupção monitorando sua execução.
-
-O processamento pode ser cancelado por:
-
-- um sinal;
-- o comando `/stop`;
-- o envio de uma nova mensagem.
-
-Se o modelo falhar com um erro `429` ou `5xx`, o Hermes verifica a lista de provedores de fallback e tenta o próximo.
+Até aqui, ele ainda está no território de qualquer app de chat. A diferença aparece no momento em que a resposta do modelo não é texto final, mas um pedido de ação.
 
 ### 5. Análise da resposta
 
-Se o modelo retorna texto, essa é a resposta final, que é persistida no armazenamento da sessão.
+Quando o modelo responde, o Hermes decide: isso já é a resposta final ou é uma instrução para continuar trabalhando?
 
-Se o modelo retorna chamadas de ferramentas, o loop continua.
+Se vier uma chamada de ferramenta, o agente executa. Se vier um lote de chamadas independentes, ele pode paralelizar. Se vier texto final, encerra o turno.
+
+Essa análise é o que transforma o modelo em operador.
 
 ## A diferença fundamental: chamadas de ferramentas
 
-Quando um modelo de linguagem determina que precisa fazer algo — executar um comando, pesquisar na web, escrever um arquivo ou ler um documento — ele retorna uma `tool_call` em vez de texto.
+É aqui que o Hermes muda de categoria.
 
-O Hermes captura essa chamada e a encaminha por meio de um registro central localizado em:
+Quando o modelo pede uma ferramenta, o sistema sai da camada de linguagem e entra na camada de ação. Isso pode significar:
 
-```text
-tools/registry.py
-```
+- rodar um comando no terminal;
+- ler ou editar arquivos;
+- pesquisar na web;
+- usar navegador;
+- controlar desktop;
+- criar cron jobs;
+- chamar subagentes;
+- consultar sessões antigas;
+- gravar memória.
 
-O registro possui mais de 70 ferramentas distribuídas em aproximadamente 28 conjuntos de ferramentas.
-
-Cada arquivo de ferramenta chama `registry.register()` no momento da importação, informando:
-
-- nome;
-- esquema;
-- função manipuladora;
-- verificação de disponibilidade;
-- metadados.
-
-Quando uma `tool_call` chega:
-
-- ferramentas de nível de agente, como memória, tarefas, busca de sessão e delegação, são interceptadas pelo próprio loop do agente, pois precisam de acesso direto ao estado;
-- todo o restante passa por `registry.dispatch()`;
-- o registro procura o manipulador;
-- a disponibilidade é verificada por meio da `check_fn`;
-- a ferramenta é executada;
-- o resultado é retornado como uma string JSON.
-
-Os erros são encapsulados em dois níveis:
-
-1. `registry.dispatch()` captura exceções do manipulador;
-2. `handle_function_call()` captura exceções de despacho.
-
-O modelo sempre recebe um resultado bem-formado, nunca um erro não tratado.
+Um chatbot comum descreve o que faria.
+O Hermes faz, verifica e volta com o resultado.
 
 ## Execução simultânea de ferramentas
 
-Múltiplas chamadas de ferramentas retornadas por uma única resposta do modelo são executadas simultaneamente por meio de um executor com pool de threads.
+Outro detalhe importante: o Hermes não precisa tratar todo trabalho como uma fila única.
 
-A exceção são as ferramentas marcadas como interativas, como `clarify`, que forçam execução sequencial.
+Se duas leituras são independentes, ele pode executá-las em paralelo. Isso reduz latência e evita desperdício de contexto. Em tarefas maiores, essa diferença acumula rápido.
 
-Assim que todos os resultados retornam, eles são acrescentados ao histórico da conversa como mensagens de função de ferramenta.
-
-Em seguida, o loop volta para a etapa de chamada de API com o novo contexto.
-
-Esse processo continua até que:
-
-- o modelo retorne uma resposta de texto; ou
-- o orçamento de iterações seja atingido.
+Na prática, isso significa menos tempo esperando e menos voltas desnecessárias no loop.
 
 ## Por que o Hermes melhora com o tempo
 
-O motivo não é magia. É estrutural.
-
-O prompt de sistema é construído em três níveis ordenados.
+O Hermes funciona em camadas diferentes de estabilidade.
 
 ### Estável
 
-Inclui:
+Aqui fica o que muda pouco e vale a pena carregar sempre:
 
-- `SOUL.md`, que define a identidade do agente;
-- orientação sobre ferramentas;
-- habilidades;
-- dicas de ambiente;
-- dicas de plataforma.
-
-Essa camada não muda no meio da conversa.
+- memória durável;
+- perfil do usuário;
+- skills;
+- convenções do ambiente.
 
 ### Contexto
 
-Inclui um dos arquivos de contexto do projeto:
+Aqui fica o que pertence à sessão atual:
 
-- `.hermes.md`;
-- `AGENTS.md`;
-- `CLAUDE.md`.
-
-Também pode incluir qualquer mensagem de sistema fornecida pelo chamador.
-
-Apenas um tipo de contexto de projeto é carregado, seguindo uma ordem de prioridade a partir do diretório de trabalho.
+- mensagens recentes;
+- arquivos lidos;
+- resultados de ferramentas;
+- decisões tomadas ao longo do turno.
 
 ### Volátil
 
-Inclui:
+Aqui fica o ruído operacional:
 
-- instantâneo de memória;
-- instantâneo do perfil do usuário;
-- bloco do provedor de memória externo;
-- linha atual com carimbo de data e hora, sessão e modelo.
+- logs temporários;
+- comandos de verificação;
+- tentativas descartadas;
+- saídas intermediárias que não merecem ser persistidas.
 
-Esses dados são atualizados entre sessões, mas permanecem congelados durante uma única conversa.
-
-A memória pode ser gravada em disco no meio da sessão, mas não altera imediatamente o prompt de sistema armazenado em cache.
-
-A atualização acontece quando ocorre um caminho de reconstrução, como:
-
-- nova sessão;
-- compressão;
-- invalidação explícita.
-
-Isso mantém o prefixo do prompt estável e favorece o cache do lado do provedor.
+Essa separação evita dois extremos ruins: esquecer tudo ou tentar guardar tudo.
 
 ## Por que essa separação é intencional
 
-Essa arquitetura produz três efeitos importantes:
+Se tudo fosse permanente, o agente viraria uma bagunça muito rápido.
+Se nada fosse permanente, cada sessão começaria do zero.
 
-1. a primeira parte do prompt — identidade, ferramentas e habilidades — pode aproveitar o cache de prompt no nível da API;
-2. alterações de memória não invalidam o cache no meio da conversa;
-3. habilidades, arquivos de contexto e dicas de plataforma possuem posição e precedência definidas.
+O desenho do Hermes tenta segurar o meio-termo útil: lembrar o que realmente se acumula e deixar passar o que só serviu para aquele momento.
+
+É por isso que o sistema de memória, skills e busca de sessões existe como peças separadas. Cada uma guarda um tipo de valor diferente.
 
 ## Cinco princípios de design
 
-A documentação destaca cinco princípios que explicam o comportamento do Hermes.
-
 ### 1. Estabilidade de prompt
 
-O prompt de sistema não muda no meio da conversa.
-
-Não há mutações que quebrem o cache, a menos que o modelo seja alterado explicitamente com:
-
-```text
-/model
-```
+Quanto mais estável o prefixo do prompt, melhor o cache funciona e menor o custo recorrente. Isso parece detalhe de implementação, mas impacta desempenho e preço.
 
 ### 2. Execução observável
 
-Toda chamada de ferramenta é visível:
-
-- indicador giratório na CLI;
-- mensagens de progresso no Telegram;
-- atualizações de callback no Discord.
-
-É possível acompanhar o que o agente está fazendo durante a execução.
+O Hermes não deveria agir no escuro. Sempre que possível, ele executa, lê o retorno e decide com base no que realmente aconteceu.
 
 ### 3. Interruptível
 
-Chamadas de API e execução de ferramentas podem ser canceladas no meio do processamento.
-
-Não se trata de forçar o encerramento do processo, mas de abandonar a solicitação anterior de forma limpa quando uma nova mensagem é enviada.
+Um agente útil não pode ser uma caixa-preta impossível de interromper. O loop precisa tolerar pausas, retomadas e revisões.
 
 ### 4. Núcleo independente de plataforma
 
-Uma única classe `AIAgent` atende:
-
-- CLI;
-- gateways de mensagens;
-- integração do editor ACP;
-- processamento em lote;
-- servidor de API.
-
-As diferenças entre plataformas ficam nos pontos de entrada, não no agente.
+CLI, desktop, gateway e automação não são produtos separados. São superfícies diferentes sobre o mesmo motor.
 
 ### 5. Acoplamento fraco
 
-Servidores MCP, plugins, provedores de memória e ambientes de RL utilizam padrões de registro e bloqueio por `check_fn`.
-
-Subsistemas opcionais não criam dependências rígidas.
-
-Se um plugin falhar ao carregar, o restante do agente continua funcionando.
+Modelo, provedor, ferramentas, perfil e interface podem mudar sem derrubar a arquitetura inteira. Isso dá longevidade ao sistema.
 
 # O que isso significa para o uso do Hermes
 
-Entender o loop do agente muda a forma como você trabalha com o Hermes.
+Na prática, entender o loop muda a forma como você usa o agente.
+
+Você para de pensar em “uma pergunta, uma resposta” e começa a pensar em “um objetivo, várias etapas, com verificação no meio”.
 
 ## Habilidades ficam no nível estável
 
-As habilidades são carregadas no nível estável do prompt.
-
-Elas permanecem disponíveis durante a sessão, mas não mudam no meio da conversa.
-
-Para fazer o agente adotar uma nova especialidade, adicione ou substitua habilidades entre sessões, não durante uma sessão já iniciada.
+Skills fazem sentido porque o Hermes tem uma camada estável onde procedimentos podem viver. Quando uma tarefa se repete, o melhor caminho não é reexplicar tudo. É formalizar o processo.
 
 ## Arquivos de contexto seguem prioridade
 
-Os arquivos de contexto são carregados a partir do diretório de trabalho seguindo esta prioridade:
-
-1. `.hermes.md`;
-2. `AGENTS.md`;
-3. `CLAUDE.md`.
-
-Um `.hermes.md` na raiz do projeto tem precedência sobre um `AGENTS.md` no mesmo diretório.
-
-O `CLAUDE.md` só é carregado quando não existe `.hermes.md` nem `AGENTS.md`.
-
-Estruture o contexto do projeto considerando essa ordem.
+Nem todo arquivo merece entrar no prompt. O Hermes precisa escolher o que vale carregar agora e o que pode ser buscado depois. Esse filtro é parte da qualidade do trabalho.
 
 ## Chamadas independentes podem ser paralelas
 
-As chamadas de ferramentas são simultâneas por padrão.
-
-Quando você pede quatro tarefas independentes, o Hermes pode executá-las em paralelo, e não necessariamente uma depois da outra.
-
-Elabore os prompts para aproveitar essa capacidade.
+Sempre que duas leituras ou consultas não dependem uma da outra, o Hermes pode ganhar tempo executando em lote. Isso vale especialmente para inspeção de repositório, leitura de arquivos e pesquisas auxiliares.
 
 ## Existe um orçamento de iterações
 
-O orçamento padrão é de 150 turnos, máximo 500. 
-
-Em alguns casos, o construtor interno AIAgent() e alguns caminhos de inicialização podem referenciar 90 como valor padrão, quando nenhum valor era fornecido explicitamente - tudo depende de como você inicia o seu agente.
-
-Cada chamada de ferramenta conta como um turno.
-
-Uma tarefa complexa que exige 15 chamadas de ferramentas consome 15 dos 150 turnos disponíveis.
-
-Os subagentes recebem orçamentos próprios e independentes, normalmente limitados a 50 turnos (Max tool-calling).
-
-Em fluxos de trabalho longos, considere o orçamento necessário para chamadas de ferramentas, e não apenas para mensagens de conversa.
+O loop não é infinito. Cada chamada de ferramenta consome orçamento. Isso protege contra espirais inúteis, runaway loops e tarefas que queimam contexto sem sair do lugar.
 
 # A arquitetura que torna tudo possível
 
-O loop do agente é a arquitetura que viabiliza todo o restante.
+No fim das contas, o valor do Hermes não está em “responder bonito”. Está em conseguir atravessar o ciclo inteiro:
 
-As habilidades se acumulam porque são carregadas como contexto estável que o modelo mantém disponível.
+- entender o pedido;
+- montar contexto útil;
+- agir com ferramentas;
+- verificar o resultado;
+- persistir o que importa;
+- deixar a sessão pronta para continuar depois.
 
-A memória se acumula porque é gravada em disco durante a sessão, mas registrada como instantâneo nos limites de sessão.
+É esse loop que sustenta tudo o que vem a seguir na masterclass.
 
-O sistema de ferramentas cresce porque novas ferramentas se autorregistram durante a importação, sem exigir conexão manual no núcleo do agente.
-
-> Chatbots preveem o próximo token.  
-> O Hermes executa um processo.
-
-Essa é a diferença que se acumula.
-
-O loop só funciona se conseguir alcançar suas ferramentas e persistir suas sessões.
-
-Este artigo é a primeira parte da Master Class do Agente Hermes. Ele foi escrito partindo da suposição de que o Hermes já está instalado.
-
-Se você ainda não tem o Hermes instalado, comece pelo guia de instalação.
-
-Novos usuários também podem consultar o material introdutório enquanto aguardam a Parte 2 da Master Class.
+Sem ele, o Hermes seria só mais uma interface para um LLM.
+Com ele, vira uma base operacional para trabalho assistido por agentes.

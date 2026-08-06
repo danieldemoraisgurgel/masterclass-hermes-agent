@@ -1,523 +1,172 @@
-# Parte 05: Ferramentas e Conjuntos de Ferramentas
+# Parte 05: Ferramentas e conjuntos de ferramentas
 
-O teste mais simples para saber se o Hermes está funcionando é fazer uma pergunta e receber uma resposta.
+Fazer uma pergunta ao Hermes e receber uma resposta coerente é o teste mais fácil do mundo.
 
-O teste funciona. Também é enganoso, porque testa o chat e deixa de fora a máquina.
+Também é o mais enganoso.
 
-O que torna o Hermes diferente de todos os chatbots que você já usou é a **superfície de ferramentas**, não a conversa.
+Esse teste prova que o chat funciona. Não prova que o agente trabalha.
 
-O agente não apenas gera texto. Ele:
+A diferença prática entre o Hermes e um chatbot comum está na superfície de ferramentas. É ela que permite sair da conversa e entrar em execução.
 
-- executa comandos;
-- pesquisa na web;
-- lê e escreve arquivos;
-- navega em páginas;
-- gera imagens;
-- transcreve fala;
-- inicia subagentes.
+## Registro central de ferramentas
 
-O chat é a camada de entrada. As ferramentas são a saída.
+No Hermes, ferramentas não ficam espalhadas como improviso. Elas passam por um registro central, com nome, descrição, parâmetros, regras de disponibilidade e, quando necessário, verificação prévia.
 
----
+Isso parece detalhe interno, mas é o que dá consistência ao agente. Ferramenta boa não é só algo que existe. É algo que pode ser descoberto, chamado, validado e controlado.
 
-## Registro Central de Ferramentas
+## Categorias de ferramentas
 
-Toda ferramenta disponível ao agente fica em um registro central:
-
-```text
-tools/registry.py
-```
-
-Quando um módulo de ferramenta é importado, ele chama `registry.register()` no nível do módulo, informando:
-
-- nome da ferramenta;
-- esquema;
-- função manipuladora;
-- verificação opcional de disponibilidade.
-
-Essa chamada autorregistra a ferramenta em um dicionário indexado por nome.
-
-O registro também descobre ferramentas automaticamente.
-
-Durante a inicialização, a função `discover_builtin_tools()` examina cada arquivo Python existente no diretório:
-
-```text
-tools/
-```
-
-Ela executa uma verificação de AST em busca de chamadas de nível superior para:
-
-```python
-registry.register()
-```
-
-Em seguida, importa os módulos correspondentes.
-
-Dessa forma, novos arquivos de ferramentas são detectados sem necessidade de conexão ou registro manual.
-
-Depois da varredura principal, ferramentas MCP e ferramentas de plugins são descobertas por seus próprios mecanismos de descoberta.
-
-O registro possui mais de **70 ferramentas**, distribuídas em aproximadamente **28 conjuntos de ferramentas**.
-
-Essa contagem não inclui as ferramentas MCP conectadas pelo próprio usuário, que são adicionadas dinamicamente ao total.
-
----
-
-## Categorias de Ferramentas
-
-As ferramentas são agrupadas em categorias de capacidades de alto nível.
+A biblioteca é ampla, mas ela fica mais fácil de entender quando você pensa em categorias.
 
 ### Web
 
-Responsável por pesquisar na internet e extrair conteúdo de páginas.
+Ferramentas de busca, leitura de páginas e coleta de informação atual.
 
-Existem duas ferramentas principais:
+São o antídoto contra um problema clássico de LLM: responder sobre o presente usando só o passado do treino.
 
-- `web_search`: pesquisa na web;
-- `web_extract`: extração de conteúdo de páginas.
+### Terminal e arquivos
 
-Essas são as ferramentas mais usadas em fluxos de pesquisa.
+Aqui mora uma parte grande do poder real do Hermes.
 
-São também o que separa um agente que inventa informações de um agente que verifica os próprios fatos.
-
----
-
-### Terminal e Arquivos
-
-Essa categoria permite:
+Essas ferramentas permitem:
 
 - executar comandos;
-- gerenciar processos em segundo plano;
 - ler arquivos;
-- escrever arquivos;
-- aplicar patches;
-- pesquisar conteúdo dentro de arquivos.
+- editar conteúdo;
+- rodar testes;
+- inspecionar repositórios;
+- iniciar processos longos.
 
-A ferramenta de terminal oferece suporte a seis backends:
-
-1. Local;
-2. Docker;
-3. SSH;
-4. Singularity;
-5. Modal;
-6. Daytona.
-
-Cada backend altera:
-
-- onde os comandos são executados;
-- o nível de isolamento;
-- o nível de persistência;
-- o grau de acesso à máquina do usuário.
-
----
+Sem isso, o agente continua preso na descrição. Com isso, ele passa a tocar o sistema.
 
 ### Navegador
 
-As ferramentas de navegador permitem:
-
-- abrir e navegar por páginas;
-- clicar em elementos;
-- digitar textos;
-- preencher formulários;
-- enviar formulários;
-- fazer capturas de tela;
-- executar JavaScript;
-- rolar páginas.
-
-O Hermes pode operar um navegador completo por meio de cinco backends:
-
-1. Browserbase na nuvem;
-2. Browser Use na nuvem;
-3. Chrome local via CDP;
-4. Chromium local gerenciado;
-5. Supervisor CDP para trabalhos com `iframes` de origem cruzada.
-
-A ferramenta de navegador não serve apenas para pesquisar informações. Ela pode efetivamente interagir com aplicações web, preencher formulários e enviá-los.
-
----
+Automação de navegador entra quando a informação ou a ação está numa interface web real. Isso inclui navegação, clique, preenchimento e captura de estado.
 
 ### Mídia
 
-As ferramentas de mídia permitem:
+Imagem, voz, OCR e outros fluxos multimodais entram aqui. Não são o centro de toda operação, mas ampliam bastante o alcance do agente.
 
-- analisar imagens por meio de visão computacional;
-- gerar imagens com base em prompts;
-- converter texto em fala.
+### Orquestração de agentes
 
-Essas ferramentas se conectam a backends específicos de modelos.
+Subagentes, delegação e tarefas paralelas vivem nessa categoria. É o que permite quebrar um trabalho grande em unidades menores sem entupir o contexto principal.
 
-Dependendo da configuração, elas exigem:
+### Memória e recuperação
 
-- acesso ao Nous Portal Tool Gateway;
-- chaves de API individuais;
-- bibliotecas ou clientes adicionais instalados.
-
----
-
-### Orquestração de Agentes
-
-Essa categoria inclui recursos para:
-
-- acompanhar tarefas;
-- solicitar esclarecimentos;
-- executar código;
-- delegar tarefas a subagentes.
-
-A ferramenta `execute_code` permite que o agente escreva scripts Python capazes de chamar outras ferramentas programaticamente.
-
-Isso pode reduzir fluxos de trabalho com várias etapas a um único turno de inferência.
-
-A ferramenta `delegate_task` inicia agentes filhos com:
-
-- contexto isolado;
-- sessões próprias de terminal;
-- execução independente da sessão principal.
-
----
-
-### Memória e Recuperação
-
-Essa categoria contém recursos de persistência e recuperação de contexto.
-
-As principais ferramentas são:
-
-- `memory`: grava informações persistentes;
-- `session_search`: pesquisa conversas e sessões anteriores.
-
-A memória é o que se acumula entre sessões.
-
-A busca de sessões é o que impede o agente de esquecer o trabalho realizado anteriormente, inclusive tarefas executadas dias ou semanas antes.
-
----
+Ferramentas para salvar fatos duráveis, consultar sessões anteriores e recuperar contexto histórico quando isso faz sentido.
 
 ### Automação
 
-A ferramenta `cronjob` permite:
-
-- criar tarefas agendadas;
-- atualizar tarefas existentes;
-- consultar tarefas;
-- gerenciar o ciclo de vida de trabalhos recorrentes;
-- remover ou desabilitar tarefas.
-
-Uma única ferramenta gerencia todo o ciclo de vida das automações recorrentes do agente.
-
----
+Cron, rotinas recorrentes e outros mecanismos que fazem o Hermes trabalhar sem depender de uma nova mensagem sua.
 
 ### Integrações
 
-As integrações incluem ferramentas específicas, como as do Home Assistant, além de qualquer servidor MCP conectado ao Hermes.
+Gateways, APIs e serviços externos entram aqui. São as pontes entre o agente e o resto do ambiente.
 
-As ferramentas MCP são registradas dinamicamente durante a execução, com base nos servidores configurados.
+# Conjuntos de ferramentas controlam o alcance do agente
 
-Cada servidor MCP expõe seu próprio conjunto de ferramentas usando um namespace semelhante a:
+Nem toda sessão precisa de tudo.
 
-```text
-mcp-<nome-do-servidor>
-```
+Por isso, o Hermes trabalha com conjuntos de ferramentas. Eles servem para limitar o escopo operacional do agente de acordo com a tarefa.
 
----
+Isso traz alguns ganhos claros:
 
-# Conjuntos de Ferramentas Controlam o Alcance do Agente
+- menos ruído no contexto;
+- menor risco operacional;
+- menor custo de prompt;
+- comportamento mais previsível.
 
-Um conjunto de ferramentas é um pacote nomeado de ferramentas.
+Um agente restrito às ferramentas certas costuma trabalhar melhor do que um agente com acesso irrestrito a tudo.
 
-Esses conjuntos existem para permitir que diferentes superfícies ou plataformas recebam diferentes níveis de capacidade.
+## Configuração dos conjuntos de ferramentas
 
-Por exemplo, o perfil da CLI pode carregar um conjunto amplo, contendo:
+Na prática, isso significa que você pode montar perfis ou execuções especializadas. Um fluxo de pesquisa pode carregar web e arquivos. Um fluxo de desenvolvimento pode precisar de terminal, arquivos e GitHub. Um cron simples talvez precise de quase nada além do essencial.
 
-- web;
-- terminal;
-- arquivos;
-- navegador;
-- visão;
-- geração de imagens;
-- delegação;
-- automação.
+Esse controle fino faz o Hermes escalar melhor, porque evita o padrão “um agente genérico tentando fazer tudo do mesmo jeito”.
 
-Já um perfil de bot do Telegram pode carregar um conjunto mais restrito, contendo apenas:
+## Verificação de disponibilidade com `check_fn`
 
-- mensagens;
-- busca de sessões;
-- tarefas cron.
+Nem toda ferramenta está sempre pronta para uso.
 
-Nesse cenário, o bot não teria acesso ao terminal nem ao navegador.
+Algumas dependem de binários instalados, variáveis de ambiente, permissões ou conectividade. A checagem de disponibilidade existe para evitar falsas promessas. Melhor descobrir cedo que uma ferramenta não está pronta do que deixar o agente descobrir isso no pior momento possível.
 
-O sistema de predefinições de plataforma gerencia esses mapeamentos automaticamente.
+# Ambientes de execução do terminal
 
----
-
-## Configuração dos Conjuntos de Ferramentas
-
-Os conjuntos de ferramentas podem ser configurados por meio do comando:
-
-```bash
-hermes tools
-```
-
-Também podem ser definidos no arquivo:
-
-```text
-config.yaml
-```
-
-É possível habilitar ou desabilitar conjuntos de ferramentas individualmente para cada plataforma.
-
-Um detalhe importante é que o atalho:
-
-```text
-all
-```
-
-habilita a maioria dos conjuntos de ferramentas, mas não todos.
-
-Conjuntos especializados, como `kanban`, exigem adesão explícita e precisam ser adicionados separadamente, mesmo quando `all` já estiver habilitado.
-
-Por isso, é importante executar:
-
-```bash
-hermes tools
-```
-
-Esse comando permite verificar o que está realmente carregado no perfil atual, evitando presumir que determinada ferramenta está disponível.
-
----
-
-## Verificação de Disponibilidade com `check_fn`
-
-Toda ferramenta pode fornecer uma função chamada:
-
-```python
-check_fn
-```
-
-Essa função retorna:
-
-- `True`, quando a ferramenta pode ser utilizada;
-- `False`, quando a ferramenta está indisponível.
-
-Por exemplo:
-
-- a ferramenta de pesquisa na web verifica se uma chave de API de pesquisa foi configurada;
-- a ferramenta de navegador verifica se um backend de navegador está acessível;
-- a ferramenta de geração de imagens verifica se o cliente FAL AI está instalado.
-
-Quando o agente cria a lista de esquemas que será apresentada ao modelo, ele executa a `check_fn` de cada ferramenta.
-
-Ferramentas indisponíveis são excluídas do esquema.
-
-Isso significa que o modelo nunca recebe definições de ferramentas que não pode utilizar de fato.
-
-Caso uma chave de API seja adicionada posteriormente e o Hermes seja reiniciado, a ferramenta correspondente passa a aparecer.
-
-A superfície de capacidades do agente pode, portanto, mudar com base apenas na configuração, sem qualquer alteração de código.
-
-Por exemplo:
-
-- instale um servidor MCP e reinicie o Hermes: novas ferramentas serão adicionadas;
-- remova uma credencial e reinicie: as ferramentas dependentes dessa credencial desaparecerão.
-
-O agente não sabe o que não pode fazer, porque as ferramentas indisponíveis não são apresentadas a ele.
-
----
-
-# Ambientes de Execução do Terminal
-
-A ferramenta de terminal oferece suporte a seis ambientes de execução, cada um com características distintas de segurança e persistência.
+O terminal é uma das peças mais poderosas do Hermes, mas o comportamento dele muda de acordo com o backend.
 
 ## Local
 
-Executa comandos diretamente na máquina do usuário.
-
-Características:
-
-- acesso amplo ao sistema;
-- baixa isolação;
-- acesso aos arquivos e recursos locais;
-- maior risco em caso de execução de comandos destrutivos.
-
----
+No local, o agente enxerga a mesma máquina em que você está trabalhando. Isso é ótimo para tarefas rápidas, inspeção do sistema e iteração direta.
 
 ## Docker
 
-Executa comandos dentro de um contêiner isolado.
-
-Características:
-
-- sistema de arquivos raiz somente leitura;
-- capacidades do sistema removidas;
-- maior isolamento em relação à máquina hospedeira;
-- ambiente controlado para execução de comandos.
-
----
+No Docker, o terminal vive dentro do contêiner. Isso é mais previsível, mas também significa que o ambiente disponível é o do contêiner, não o da máquina host. Se algo precisa existir ali, você precisa colocar ali.
 
 ## SSH
 
-Delega a execução para um servidor remoto.
-
-Esse modelo mantém o agente afastado da máquina e do código locais.
-
-É útil para:
-
-- administração remota;
-- execução em servidores dedicados;
-- separação do ambiente de controle e do ambiente de trabalho.
-
----
+Com SSH, o Hermes executa em outra máquina. É uma forma elegante de levar o agente até onde os recursos estão.
 
 ## Singularity
 
-Oferece suporte a ambientes de computação de alto desempenho, especialmente clusters HPC.
-
-É adequado para cenários nos quais Docker não está disponível ou não é permitido.
-
----
+Em ambientes científicos ou institucionais, Singularity pode ser o caminho natural para ganhar isolamento sem depender do ecossistema Docker.
 
 ## Modal e Daytona
 
-Executam comandos em ambientes de nuvem sem servidor.
+Aqui o terminal pode existir em workspaces efêmeros ou sob demanda. Funciona muito bem para certos fluxos, mas exige que você pense melhor em persistência e disponibilidade.
 
-Esses ambientes podem hibernar quando estão ociosos, reduzindo o consumo de recursos.
+# Persistência do backend Docker
 
-São úteis para:
+Esse ponto merece reforço: contêiner descartável com volume persistente é ótimo. Contêiner descartável sem volume persistente é uma armadilha.
 
-- execução temporária;
-- isolamento;
-- tarefas elásticas;
-- ambientes descartáveis ou sob demanda.
+Quando o volume está certo, o Hermes mantém estado.
+Quando não está, parece que o sistema sofre amnésia a cada reinício.
 
----
+# Gerenciamento de processos em segundo plano
 
-# Persistência do Backend Docker
+Outra capacidade importante é iniciar processos longos e continuar trabalhando enquanto eles rodam.
 
-O backend Docker merece atenção especial.
+Isso vale para:
 
-No primeiro uso, o Hermes inicia um único contêiner de longa duração.
+- servidores locais;
+- builds demorados;
+- testes longos;
+- watchers;
+- pipelines auxiliares.
 
-Todas as chamadas das seguintes ferramentas são encaminhadas para esse mesmo contêiner:
+O ganho aqui não é só conforto. É continuidade operacional. O agente não precisa ficar travado esperando tudo acabar para só então seguir.
 
-- terminal;
-- arquivos;
-- `execute_code`.
+# Comandos perigosos exigem aprovação
 
-Dentro da vida útil do processo, permanecem disponíveis:
+Poder de execução sem controle vira risco rápido.
 
-- alterações no diretório de trabalho;
-- pacotes instalados;
-- arquivos criados;
-- configurações de ambiente;
-- mudanças realizadas por subagentes.
+Por isso, comandos destrutivos ou potencialmente perigosos passam por aprovação. Essa camada não existe para atrapalhar o fluxo. Ela existe para impedir que o agente aja além do que deveria.
 
-Essas alterações persistem entre chamadas de ferramentas e delegações de subagentes.
+É uma das diferenças entre “automação útil” e “automação irresponsável”.
 
-Por padrão, quando o Hermes é encerrado, o contêiner é interrompido e removido.
+# Por que o acesso a ferramentas muda tudo
 
-Para preservar o espaço de trabalho entre reinicializações, é possível utilizar:
+Sem ferramentas, o agente interpreta o mundo por descrição.
+Com ferramentas, ele interage com o mundo por observação e ação.
 
-```yaml
-container_persistent: true
-```
+Isso muda tudo porque troca plausibilidade por verificação.
 
-Com essa configuração, o ambiente de trabalho sobrevive às reinicializações do Hermes.
+Um exemplo simples:
 
----
+- sem terminal, o modelo diz como checaria a versão do Python;
+- com terminal, ele checa de fato;
+- com arquivo, ele pode registrar resultado;
+- com processo em segundo plano, ele ainda acompanha o que ficou rodando.
 
-# Gerenciamento de Processos em Segundo Plano
+É isso que faz o Hermes ser operacional, e não apenas eloquente.
 
-O gerenciamento de processos em segundo plano está integrado à superfície de ferramentas.
+# Teste de fumaça essencial
 
-Um comando pode ser iniciado em segundo plano por meio de uma chamada semelhante a:
+Se você quer saber se a superfície principal está viva, faça um teste curto e honesto:
 
-```text
-terminal(background=true)
-```
+1. rode um comando simples no terminal;
+2. leia ou escreva um arquivo;
+3. faça uma consulta externa quando aplicável.
 
-A ferramenta `process` pode então:
+Se essas peças funcionam, o Hermes já passou do nível “conversa convincente” e entrou no nível “agente que consegue trabalhar”.
 
-- listar processos;
-- consultar o estado de um processo;
-- aguardar sua conclusão;
-- enviar dados para a entrada padrão;
-- encerrar processos;
-- fechar processos concluídos.
-
-O modo PTY permite utilizar ferramentas de linha de comando interativas, como:
-
-- Codex;
-- Claude Code;
-- outras aplicações que exigem um terminal interativo.
-
----
-
-# Comandos Perigosos Exigem Aprovação
-
-A ferramenta de terminal possui um sistema de detecção de comandos perigosos.
-
-A variável:
-
-```python
-DANGEROUS_PATTERNS
-```
-
-contém uma lista de expressões regulares que identifica operações potencialmente destrutivas.
-
-Entre os padrões detectados estão:
-
-- exclusões recursivas;
-- formatação de sistemas de arquivos;
-- operações SQL destrutivas;
-- sobrescrita de configurações do sistema;
-- manipulação de serviços;
-- execução remota de código;
-- fork bombs.
-
-Quando um comando corresponde a um desses padrões, o agente solicita aprovação antes de executá-lo.
-
-Na CLI, o usuário recebe um prompt interativo.
-
-Em plataformas de mensagens, o agente envia uma solicitação de aprovação pelo próprio chat.
-
-As aprovações são rastreadas por sessão.
-
-Também é possível configurar uma lista permanente de permissões no arquivo:
-
-```text
-config.yaml
-```
-
----
-
-# Por Que o Acesso a Ferramentas Muda Tudo
-
-Todos os recursos apresentados no restante desta série dependem das ferramentas.
-
-- Skills são procedimentos executados por meio de ferramentas.
-- Trabalhos cron agendam chamadas de ferramentas.
-- A delegação inicia subagentes que utilizam ferramentas.
-- A automação de navegador é uma categoria de ferramenta.
-- O uso de computador depende de ferramentas.
-- O loop do agente despacha e acompanha chamadas de ferramentas.
-
-Sem uma superfície de ferramentas funcional, o Hermes é apenas um chatbot com memória persistente.
-
-Com uma superfície de ferramentas funcional, o agente pode agir sobre o mundo.
-
----
-
-# Teste de Fumaça Essencial
-
-O primeiro teste de fumaça apresentado no 'Parte 2' continua sendo a etapa de verificação mais importante para qualquer instalação do Hermes.
-
-O teste utiliza três chamadas de ferramentas, cobrindo:
-
-1. terminal;
-2. web;
-3. arquivos.
-
-Se essas três categorias funcionarem, a superfície principal de ferramentas está acessível.
-
-Se uma delas falhar, o problema deve ser corrigido antes da implementação de qualquer recurso adicional, porque todo o restante depende dessas capacidades.
-
-A superfície de ferramentas torna o agente capaz.
-
-Porém, uma capacidade que funciona apenas enquanto você está sentado diante do teclado representa somente metade da história.
+E é aí que a ferramenta começa a valer mesmo.
