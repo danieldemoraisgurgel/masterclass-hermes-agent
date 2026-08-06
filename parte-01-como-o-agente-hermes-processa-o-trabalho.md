@@ -301,13 +301,15 @@ Elabore os prompts para aproveitar essa capacidade.
 
 ## Existe um orçamento de iterações
 
-O orçamento padrão é de 150 turnos.
+O orçamento padrão é de 150 turnos, máximo 500. 
+
+Em alguns casos, o construtor interno AIAgent() e alguns caminhos de inicialização podem referenciar 90 como valor padrão, quando nenhum valor era fornecido explicitamente - tudo depende de como você inicia o seu agente.
 
 Cada chamada de ferramenta conta como um turno.
 
 Uma tarefa complexa que exige 15 chamadas de ferramentas consome 15 dos 150 turnos disponíveis.
 
-Os subagentes recebem orçamentos próprios e independentes, normalmente limitados a 50 turnos.
+Os subagentes recebem orçamentos próprios e independentes, normalmente limitados a 50 turnos (Max tool-calling).
 
 Em fluxos de trabalho longos, considere o orçamento necessário para chamadas de ferramentas, e não apenas para mensagens de conversa.
 
