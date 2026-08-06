@@ -105,7 +105,7 @@ O padrão que vi funcionar para a maioria das pessoas é:
 2. Adicionar Docker ou um backend de nuvem quando quiser que o agente funcione de modo independente.
 3. Conectar gateways para poder acessá-lo de qualquer lugar.
 
-A morada do agente determina quanto do restante do sistema estará disponível para você.
+Onde o agente vai executar determina o quanto o Hermes estará disponível para você.
 
 ---
 
