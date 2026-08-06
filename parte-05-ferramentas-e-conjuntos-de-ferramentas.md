@@ -35,7 +35,7 @@ Quando um módulo de ferramenta é importado, ele chama `registry.register()` no
 - função manipuladora;
 - verificação opcional de disponibilidade.
 
-Essa chamada autorregistra a ferramenta em um dicionário singleton indexado por nome.
+Essa chamada autorregistra a ferramenta em um dicionário indexado por nome.
 
 O registro também descobre ferramentas automaticamente.
 
