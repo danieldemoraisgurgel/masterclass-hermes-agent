@@ -300,7 +300,7 @@ O padrão é de **150 turnos**.
 
 Cada chamada de ferramenta conta como um turno.
 
-Se sua primeira tarefa real exigir dez chamadas de ferramentas, isso representará dez dos seus 90 turnos.
+Se sua primeira tarefa real exigir dez chamadas de ferramentas, isso representará dez dos seus 150 turnos.
 
 Portanto, elabore o teste de fumaça para comprovar que a superfície de ferramentas funciona, não para esgotar o orçamento.
 
