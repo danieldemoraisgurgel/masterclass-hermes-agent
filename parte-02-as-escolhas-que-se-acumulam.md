@@ -336,8 +336,4 @@ Sessões e ferramentas dão memória ao agente.
 
 Mas memória sem estrutura é apenas uma pilha de fatos.
 
-Se você perdeu a Parte 1, pode encontrá-la aqui.
-
-A próxima parte desta Master Class do Hermes mostrará como o sistema de aprendizado realmente funciona: como memória, habilidades e contexto fazem as informações se acumularem de maneira útil, em vez de apenas formarem uma pilha de dados.
-
 **Fique ligado!**
