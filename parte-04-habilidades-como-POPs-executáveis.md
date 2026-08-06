@@ -176,7 +176,6 @@ Exemplo:
    ```bash
    ./deploy.sh
    ```
-```
 
 ---
 
@@ -203,7 +202,6 @@ Exemplo em Markdown:
 - Não considere uma resposta HTTP `202` como conclusão da operação.
 - Depois de receber `202`, consulte o endpoint de status até que o recurso esteja marcado como `ready`.
 - Nunca execute o script de implantação como `root`.
-```
 
 ---
 
