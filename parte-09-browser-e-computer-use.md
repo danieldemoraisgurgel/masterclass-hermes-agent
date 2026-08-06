@@ -1,420 +1,169 @@
 # Parte 09: Navegador e Computer Use
-Todas as ferramentas desta série até agora foram baseadas em texto:
 
-- O terminal executa comandos e retorna texto.
-- As ferramentas de arquivo leem e escrevem texto.
-- A busca na web retorna texto.
-- Até mesmo o sistema de cron funciona com entrada e saída em texto.
+Até aqui, quase tudo na masterclass operou em cima de texto.
 
-A automação de Navegador e o Computer Use rompem esse padrão.
+Terminal devolve texto. Arquivo devolve texto. Busca devolve texto. Até cron, na maior parte do tempo, vive em prompts e saídas textuais.
 
-A ferramenta de navegador navega em sites reais, clica em botões, preenche formulários e interage com páginas web. A ferramenta de Computer Use controla uma área de trabalho real, clicando, digitando, rolando e arrastando em sistemas macOS, Windows e Linux.
+Browser automation e Computer Use quebram esse limite.
 
-O cursor do usuário não se move, o foco da janela não muda e o agente trabalha ao lado do usuário na mesma máquina.
-
-Essas são as ferramentas que permitem ao Hermes operar em interfaces que nunca foram projetadas para APIs.
-
----
+De repente, o agente não lida só com comandos ou documentos. Ele passa a interagir com interfaces reais.
 
 ## Automação de navegador
 
-O conjunto de ferramentas de navegador transforma o Hermes em um navegador web completo.
+A automação de navegador permite que o Hermes faça o tipo de coisa que normalmente exigiria um humano clicando:
 
-Ele pode:
+- abrir páginas;
+- navegar por fluxos web;
+- preencher campos;
+- clicar em botões;
+- capturar o estado da tela;
+- ler o DOM e a estrutura da página.
 
-- Navegar por páginas;
-- Clicar em elementos;
-- Digitar texto;
-- Capturar screenshots;
-- Executar JavaScript;
-- Rolar páginas;
-- Consultar erros no console do navegador.
-
-O agente visualiza a página por meio de uma **árvore de acessibilidade**, ou seja, um instantâneo textual com IDs de referência numerados para cada elemento interativo.
-
-Por exemplo:
-
-- Clicar em `@e5` para pressionar um botão;
-- Digitar em `@e3` para preencher um campo de busca;
-- Ler o console para identificar erros de JavaScript.
-
----
+Isso é muito útil em sistemas que até têm interface web, mas não oferecem uma API boa ou não oferecem API nenhuma.
 
 ## Backends disponíveis
 
-Cinco backends atendem a diferentes casos de uso.
+O backend exato pode mudar, mas a lógica geral é a mesma: dar ao agente uma forma controlada de operar o navegador.
 
 ### Navegadorbase
 
-O modo em nuvem do Navegadorbase oferece navegadores gerenciados com:
-
-- Proxies residenciais;
-- Resolução de CAPTCHA;
-- Recursos adequados para sites que combatem automações e bots.
+Entra como uma camada de automação mais estruturada para páginas web.
 
 ### Navegador Use
 
-O Navegador Use funciona como um provedor de nuvem alternativo, com recursos próprios de automação e antidetecção.
+Ajuda quando a tarefa pede interação mais direta com o fluxo da página.
 
 ### Firecrawl
 
-O Firecrawl também atua como provedor de nuvem alternativo, oferecendo mecanismos próprios para navegação, extração e interação com páginas web.
+É útil em cenários de coleta, extração e leitura web mais focada em conteúdo.
 
 ### Chromium local via CDP
 
-O modo Chromium local via **Chrome DevTools Protocol — CDP** conecta o Hermes a uma instalação existente do Chrome ou Brave.
+Ótimo quando você quer conectar o Hermes a um navegador real já rodando localmente, com mais visibilidade do estado da página.
 
 ### Chromium local padrão
 
-O modo local padrão utiliza uma instalação do Chromium controlada pela CLI `agent-Navegador`.
-
----
+Serve bem para automações locais em ambiente controlado, sem depender de uma conexão externa com navegador separado.
 
 ## Roteamento híbrido
 
-O recurso de roteamento híbrido merece destaque.
+Na prática, o Hermes pode escolher entre abordagens diferentes conforme o tipo de trabalho.
 
-Quando um provedor de nuvem está configurado:
+Às vezes faz mais sentido operar a página por estrutura semântica.
+Às vezes é melhor clicar visualmente.
+Às vezes basta extrair conteúdo.
 
-- URLs públicas são acessadas pelo navegador em nuvem;
-- Endereços locais ou privados são automaticamente direcionados para um Chromium local.
-
-Isso inclui endereços como:
-
-```text
-localhost
-127.0.0.1
-192.168.x.x
-10.x.x.x
-172.16.x.x
-```
-
-O servidor local de desenvolvimento nunca precisa trafegar pela rede do provedor de nuvem.
-
-Na mesma conversa, o agente pode:
-
-```text
-Capturar uma screenshot de http://localhost:3000
-```
-
-e também:
-
-```text
-Extrair dados de https://github.com
-```
-
-Tudo isso sem trocar manualmente de provedor.
-
----
+Essa flexibilidade evita forçar um único modelo de automação em tudo.
 
 ## Exemplo de preenchimento de formulário
 
-O exemplo de formulário web da documentação demonstra bem essa capacidade.
+Esse é o caso mais fácil de imaginar.
 
-O usuário solicita:
+O agente abre a página, encontra os campos, digita, clica no envio e depois verifica se a ação realmente aconteceu.
 
-> Cadastre-se para criar uma conta.
-
-O agente então:
-
-1. Navega até a página de cadastro;
-2. Captura um instantâneo da página;
-3. Identifica os campos do formulário por meio dos IDs de referência;
-4. Digita o e-mail e a senha nos campos corretos;
-5. Clica no botão de criação da conta;
-6. Captura um novo instantâneo;
-7. Confirma se a operação foi concluída com sucesso.
-
-Esse tipo de interação era impossível para agentes limitados exclusivamente a texto.
-
----
+O ponto importante aqui não é o glamour do clique. É a verificação depois do clique. Sem isso, automação vira aposta.
 
 # Computer Use
 
-O computer use estende o mesmo princípio para toda a área de trabalho.
+Se browser automation resolve páginas, Computer Use amplia isso para o desktop inteiro.
 
-O agente pode capturar qualquer janela visível como uma screenshot, adicionando sobreposições numeradas sobre os elementos interativos.
+O Hermes pode operar uma área de trabalho real em macOS, Windows ou Linux, com captura da interface, leitura de elementos e ações como:
 
-Ele consegue:
+- clicar;
+- digitar;
+- rolar;
+- arrastar;
+- usar atalhos de teclado.
 
-- Clicar em elementos;
-- Digitar textos;
-- Pressionar combinações de teclas;
-- Rolar interfaces;
-- Arrastar objetos;
-- Interagir com aplicações nativas;
-- Trabalhar com diálogos do sistema operacional.
-
-O agente clica utilizando o índice de cada elemento, e não coordenadas fixas de pixel.
-
-Esse método é consideravelmente mais confiável, especialmente quando:
-
-- A janela muda de tamanho;
-- A resolução da tela é alterada;
-- Um elemento se desloca;
-- A interface possui layouts responsivos.
-
----
+Isso abre a porta para aplicações que nunca foram pensadas para integração programática.
 
 ## Execução em segundo plano
 
-O modelo de execução em segundo plano é uma das principais decisões de design.
+Uma das melhores características aqui é a execução em segundo plano. O agente consegue agir sem roubar o seu cursor e sem tomar o foco da sua janela.
 
-Quando o agente clica em alguma coisa:
-
-- O cursor real do sistema operacional permanece no lugar;
-- A janela utilizada pelo agente não é trazida para a frente;
-- As áreas de trabalho virtuais não são alteradas;
-- O foco atual do usuário é preservado.
-
-O agente trabalha na mesma máquina enquanto o usuário continua executando suas próprias atividades.
-
-Uma sobreposição colorida de cursor mostra onde o agente está atuando. Dessa forma, o usuário pode acompanhar suas ações sem perder o contexto da própria atividade.
-
----
+Ou seja: você continua usando a máquina enquanto ele trabalha.
 
 ## Cursores independentes por sessão
 
-O cursor do agente possui escopo de sessão.
-
-Cada sessão do Hermes e cada subagente recebem uma identidade própria de cursor.
-
-Isso permite que múltiplos agentes trabalhem simultaneamente sem produzir comportamentos confusos, como movimentos concorrentes ou um cursor interferindo no outro.
-
----
+Essa separação visual e operacional ajuda bastante. Fica claro o que é ação do agente e o que é ação sua, sem virar uma guerra pelo mouse.
 
 ## Compatibilidade com modelos
 
-O Computer Use funciona com qualquer modelo capaz de utilizar ferramentas, incluindo:
-
-- Claude;
-- GPT;
-- Gemini;
-- Modelos abertos;
-- Modelos executados em endpoints locais.
-
-Não existe dependência de um esquema específico de fornecedor.
-
-O conjunto de ferramentas utiliza **MCP por stdio** para se comunicar com o `cua-driver`.
-
-O `cua-driver` é um driver de código aberto executado em segundo plano, responsável por lidar com a pilha de acessibilidade específica de cada plataforma.
-
----
+Nem todo modelo lida com visão e interface do mesmo jeito. Por isso, a camada de automação precisa conversar bem com a capacidade visual disponível e com as ferramentas de captura e navegação do sistema.
 
 # Navegador versus Computer Use
 
-A automação de navegador e o Computer Use possuem capacidades semelhantes, mas atendem a propósitos diferentes.
+As duas coisas parecem próximas, mas não são iguais.
 
 ## Automação de navegador
 
-A automação de navegador opera dentro de uma instância isolada do Chromium.
-
-Características:
-
-- Fica isolada da máquina do usuário;
-- Não consegue abrir acidentalmente aplicações externas;
-- Não altera configurações do sistema operacional;
-- Utiliza cookies, cache e fingerprint próprios;
-- Limpa automaticamente a sessão após um período de inatividade;
-- É indicada para tarefas exclusivamente web.
+É melhor quando o alvo é uma página web, com estrutura DOM acessível e fluxo relativamente previsível.
 
 ## Computer Use
 
-O Computer Use opera diretamente sobre a área de trabalho real.
-
-O agente pode:
-
-- Abrir aplicativos;
-- Interagir com diálogos nativos;
-- Navegar por interfaces sem equivalente web;
-- Consultar mensagens em aplicativos;
-- Abrir documentos;
-- Alterar configurações do sistema;
-- Interagir com ferramentas empresariais legadas.
-
-Exemplos:
-
-- Localizar o e-mail mais recente da Stripe;
-- Abrir um documento em um editor de texto;
-- Configurar uma definição do sistema operacional;
-- Interagir com uma aplicação sem API.
-
----
+É melhor quando o alvo está fora do browser ou quando a interface depende de elementos nativos, canvas, apps desktop, diálogos do sistema ou fluxos visuais sem API.
 
 ## Qual ferramenta utilizar
 
-Para tarefas exclusivamente web, utilize o conjunto de ferramentas de navegador.
+A pergunta prática é: o que exatamente você está tentando operar?
 
-Ele tende a ser:
-
-- Mais rápido;
-- Mais barato;
-- Mais isolado;
-- Mais previsível;
-- Independente de permissões específicas da plataforma.
-
-Para tarefas nativas de área de trabalho, especialmente aquelas que envolvem aplicações sem interface web, utilize o Computer Use.
-
----
+Se a tarefa cabe num navegador com estrutura legível, comece pelo navegador.
+Se depende da tela como um todo, vá para Computer Use.
 
 # Proteções de segurança
 
-As duas ferramentas possuem múltiplas camadas de proteção.
+Esse tipo de poder precisa vir com cuidado redobrado.
 
 ## Segurança da automação de navegador
 
-O conjunto de ferramentas de navegador possui menos preocupações relacionadas a comandos perigosos, pois as ações são executadas dentro de uma sessão isolada.
-
-As principais limitações são:
-
-- Não pode baixar arquivos diretamente pelo navegador;
-- Depende da árvore de acessibilidade em vez de coordenadas de pixel;
-- As sessões expiram conforme o plano do provedor;
-- Alguns sites podem limitar ou bloquear automações.
+O agente não deveria sair confirmando compras, aceitando permissões sensíveis ou fazendo ações não solicitadas só porque um botão existe.
 
 ## Segurança do Computer Use
 
-O Computer Use possui um modelo de segurança mais abrangente.
-
-Toda captura que apresenta um diálogo de permissão é sinalizada.
-
-Algumas ações são rigidamente bloqueadas no nível da ferramenta, incluindo:
-
-- Esvaziar a lixeira;
-- Efetuar logout;
-- Bloquear a tela;
-- Forçar exclusões;
-- Executar determinadas combinações perigosas de teclas;
-- Digitar padrões perigosos de shell.
-
-Combinações de teclas como a tecla Windows também podem ser filtradas.
-
-O prompt de sistema do agente impede explicitamente que ele:
-
-- Clique em diálogos de permissão;
-- Digite senhas;
-- Contorne mecanismos de segurança;
-- Execute ações destrutivas sem aprovação.
-
----
+No desktop, o cuidado é ainda maior. Prompt de senha, caixa de pagamento, diálogo de privilégio e confirmação crítica não são coisas para clicar no automático.
 
 ## Proteção contra injeção de prompt pela interface
 
-Screenshots são tratadas como dados, não como instruções.
-
-O agente é orientado a não obedecer a diretivas incorporadas em imagens ou interfaces.
-
-Essa abordagem reduz o risco de ataques de **prompt injection via interface gráfica**, nos quais uma página ou aplicação exibe instruções maliciosas tentando controlar o agente.
-
----
+Toda interface pode carregar texto malicioso. O agente precisa seguir a instrução do usuário, não o que aparecer numa página tentando redirecionar o comportamento.
 
 ## Aprovação de ações
 
-O bloqueio por aprovação permite que o usuário visualize uma ação antes de sua execução.
-
-Na CLI, o usuário recebe um prompt interativo.
-
-Em plataformas de mensagens, podem ser exibidos botões de aprovação.
-
-A proteção também pode ser configurada em modo manual, exigindo confirmação para cada ação executada pelo agente.
-
----
+Aprovação continua sendo a linha de defesa quando a ação tem impacto relevante. Em automação visual, isso importa muito.
 
 # Consumo de tokens por screenshots
 
-Screenshots possuem um custo elevado de contexto.
+A parte menos glamourosa, mas muito real, é custo.
 
-Uma única screenshot com resolução aproximada de:
-
-```text
-1568 × 900
-```
-
-pode consumir cerca de:
-
-```text
-1.500 tokens
-```
-
-Uma sessão com 20 ações e sem mecanismos de otimização poderia consumir rapidamente a janela de contexto do modelo.
-
----
+Captura de tela consome contexto. Fluxos longos com muitas imagens podem inflar o orçamento rápido.
 
 ## Otimizações aplicadas pelo Hermes
 
-O Hermes utiliza quatro mecanismos principais de otimização.
+Por isso entram várias otimizações.
 
 ### 1. Retenção das screenshots mais recentes
 
-O adaptador mantém somente as três screenshots mais recentes no contexto.
-
-As imagens mais antigas são substituídas por marcadores de texto.
+O sistema tenta manter o que ainda é útil para a próxima decisão, sem carregar um museu completo de telas antigas.
 
 ### 2. Compressão de contexto
 
-O compressor de contexto remove partes antigas de imagens presentes nos resultados das ferramentas.
+Quando necessário, a sessão é compactada para não estourar a janela.
 
 ### 3. Contabilização fixa de imagens
 
-Cada imagem é contabilizada com uma taxa fixa de aproximadamente 1.500 tokens na Anthropic, independentemente do tamanho do conteúdo em Base64.
+Tratar imagens com custo previsível ajuda a manter o orçamento sob controle.
 
 ### 4. Limpeza no lado do servidor
 
-Na Anthropic, resultados antigos de ferramentas são removidos no lado do servidor.
-
-Com essas otimizações, uma sessão completa normalmente consome cerca de:
-
-```text
-30.000 tokens
-```
-
-em contexto de screenshots, em vez de aproximadamente:
-
-```text
-600.000 tokens
-```
-
----
+Descartar o que não é mais necessário também faz parte da higiene operacional.
 
 # Modo de árvore de acessibilidade
 
-O modo de árvore de acessibilidade é uma alternativa adequada para modelos que trabalham somente com texto ou para cenários em que se deseja economizar tokens.
-
-Nesse modo, o agente recebe a estrutura textual da interface, sem a screenshot.
-
-Ele ainda pode:
-
-- Navegar;
-- Clicar;
-- Digitar;
-- Identificar campos;
-- Acionar botões;
-- Ler textos;
-- Interagir com elementos acessíveis.
-
-A principal limitação é que o agente não consegue visualizar o layout gráfico da interface.
-
----
+Quando existe uma árvore de acessibilidade rica, o Hermes ganha um mapa muito melhor da interface. Isso costuma deixar a automação mais robusta do que depender apenas de pixels.
 
 # Conclusão
 
-A automação de navegador permite que o agente interaja com praticamente qualquer site, inclusive aqueles que:
+Browser automation e Computer Use expandem o alcance do Hermes para onde APIs não chegam.
 
-- Utilizam renderização JavaScript;
-- Possuem formulários complexos;
-- Dependem de interfaces dinâmicas;
-- Tentam detectar ou bloquear bots.
+Se algo está numa página, numa janela, num formulário ou numa interface legada, há uma boa chance de o agente conseguir interagir com aquilo.
 
-O Computer Use permite que o agente interaja com praticamente qualquer aplicação na área de trabalho, inclusive aquelas que:
-
-- Não possuem API;
-- Não possuem versão web;
-- Nunca foram projetadas para automação;
-- Dependem de diálogos nativos;
-- Utilizam interfaces gráficas legadas.
-
-Ambas as ferramentas estendem o Hermes para ambientes que agentes exclusivamente textuais não conseguem alcançar.
-
-> Se algo pode ser visto na tela, provavelmente o agente consegue interagir com esse elemento.
-
-O agente já consegue ver, clicar, digitar e navegar. No entanto, gerenciar múltiplos agentes, cada um com suas próprias tarefas, sessões e contextos, exige uma camada adicional de coordenação.
+Esse é um passo importante porque leva o Hermes para o território das interfaces reais, com toda a utilidade e toda a responsabilidade que isso traz.

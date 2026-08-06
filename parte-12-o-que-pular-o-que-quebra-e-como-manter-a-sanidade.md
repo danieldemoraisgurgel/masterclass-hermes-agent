@@ -1,386 +1,136 @@
-# Parte 12: O que Pular, o que Quebra e Como Manter a Sanidade
+# Parte 12: O que pular, o que quebra e como manter a sanidade
 
-Onze artigos de recursos, ferramentas e possibilidades. Agora, a conversa real.
+Depois de onze partes falando de arquitetura, capacidade e operação, vale fazer a conversa mais honesta.
 
-Hermes é o agente de código aberto mais capaz que já usei. Também é um sistema complexo, com arestas afiadas.
+Hermes é poderoso. Também é um sistema com arestas.
 
-Entender o que quebra, o que pular e quando usar outra coisa é a diferença entre um agente que se acumula e um que frustra.
+Saber o que usar, o que adiar e o que evitar é parte da maturidade de uso. Sem isso, a ferramenta deixa de parecer ampliação de capacidade e começa a parecer fonte de atrito.
 
-Aqui estão os modos de falha que encontrei, as coisas que pulo e as regras que sigo.
+## Todo modelo tem uma janela de contexto
 
-## Toda Modelo Tem uma Janela de Contexto
+Esse é um limite estrutural, não um detalhe cosmético.
 
-O Hermes é executado dentro dessa janela. O prompt de sistema, o snapshot de memória, o índice de habilidades, o histórico da conversa e os resultados de chamadas de ferramentas disputam o mesmo espaço limitado.
+Tudo disputa espaço dentro da janela:
 
-A compressão de pré-voo entra em ação em 50% da janela de contexto. O gateway faz compressão automática em 85%.
+- instruções de sistema;
+- memória;
+- índice de skills;
+- conversa recente;
+- resultados de ferramentas;
+- screenshots e outros anexos.
 
-Os turnos do meio são resumidos. As últimas 20 mensagens são preservadas. Uma nova linhagem de sessão é criada.
+Sessões longas, investigações grandes e fluxos com muita ferramenta queimam contexto rápido. A compressão ajuda, mas compressão não faz milagre. Resumo sempre perde nuance.
 
-Isso é automático e geralmente invisível. Também é destrutivo.
+O jeito saudável de pensar nisso é simples: contexto é orçamento. Gaste com intenção.
 
-> Conteúdo comprimido é um resumo, não o original.
+## A fragilidade das integrações é constante
 
-Cadeias longas de chamadas de ferramentas aceleram a pressão no contexto. Uma única tarefa de pesquisa pode produzir:
+Quanto mais o Hermes conversa com o mundo externo, mais você passa a depender de peças que podem falhar por motivos fora do seu controle.
 
-- Cinco resultados de busca;
-- Três extrações de página;
-- Um resumo.
+API muda. Página muda. Bot cai. Sessão expira. Permissão quebra. Binário some. Isso não é exceção. É o custo normal de operar integrações.
 
-Isso representa nove pares de chamada de ferramenta e resultado alimentando o histórico da conversa. Se o modelo executar outro lote, o histórico dobra.
+Por isso, vale assumir desde o começo que observabilidade e recuperação fazem parte do sistema.
 
-A compressão de pré-voo lida com isso, mas o agente perde nuance a cada compressão.
+## O isolamento de perfis tem armadilhas
 
-O orçamento de iterações é a válvula de segurança. O padrão é de 90 turnos. Cada chamada de ferramenta conta como um turno.
+Separar perfis é ótimo. Também traz alguns tropeços previsíveis.
 
-Uma tarefa complexa com 20 chamadas de ferramentas usa 20 dos 90 turnos.
+### Isolamento do diretório pessoal
 
-Subagentes têm seus próprios orçamentos. Portanto, a delegação é uma solução alternativa para o contexto limitado. As iterações do agente filho não contam contra o orçamento do agente pai.
+Se o perfil não enxerga o que deveria enxergar, várias automações simplesmente não funcionam. Se enxerga demais, você perde a proteção que queria.
 
-> **Regra prática:** se uma tarefa precisar de mais de 30 chamadas de ferramentas, delegue-a a um subagente ou divida-a em múltiplas sessões.
+### Conflitos de tokens do gateway
 
-Não deixe uma única cadeia de conversa crescer até ser comprimida e se tornar ilegível.
+Tokens e credenciais podem se atropelar se a separação entre perfis estiver mal feita. Isso costuma dar uma dor de cabeça chata porque o erro aparece na superfície errada.
 
-## A Fragilidade das Integrações é Constante
+### Persistência de sessões
 
-Toda ferramenta que depende de um serviço externo é um ponto de falha.
+Perfil isolado sem persistência confiável gera um agente que parece especializado, mas esquece tudo a cada reinício.
 
-- A ferramenta de busca na web precisa de uma chave de API.
-- A ferramenta de navegador precisa de saldo de crédito de um provedor de nuvem ou de uma instância local do Chromium em execução.
-- A ferramenta de geração de imagens precisa ter o cliente FAL instalado.
-- A ferramenta de TTS precisa de uma chave do ElevenLabs ou de um serviço semelhante.
+## O curador pode morder
 
-Credenciais expiram. Limites de taxa são atingidos. Planos gratuitos acabam.
+Curadoria de skills é ótima até o momento em que uma limpeza agressiva remove algo que ainda importava.
 
-O `check_fn` da ferramenta informa que ela está indisponível, e o modelo perde silenciosamente o acesso.
+Isso não é argumento contra curadoria. É argumento a favor de fazer curadoria com critério, snapshot e rollback.
 
-Sem erro. Sem alerta. A ferramenta simplesmente não aparece no esquema.
+## O que pular
 
----
-
-**Página 42**
-
----
-
-O sistema de provedor alternativo lida com falhas do modelo. Quando o modelo primário retorna um erro `429` ou `5xx`, o Hermes tenta a lista de alternativas.
-
-Entretanto, as alternativas cobrem somente o modelo, não as ferramentas.
-
-Se sua chave de API de busca na web expirar, a ferramenta de busca desaparece independentemente de qual modelo você esteja usando.
-
-> **Regra prática:** execute `hermes tools` periodicamente para verificar se sua superfície de ferramentas está intacta.
-
-Configure um trabalho cron semanal que teste as três ferramentas do Artigo 2:
-
-1. Terminal;
-2. Web;
-3. Arquivo.
-
-O trabalho deve alertar você caso alguma delas falhe.
-
-> Uma ferramenta que desaparece silenciosamente é pior que uma ferramenta que nunca funcionou.
-
-## O Isolamento de Perfis Tem Armadilhas
-
-Perfis oferecem agentes independentes. Eles também compartilham seu sistema real por padrão.
-
-O valor padrão de `terminal.home_mode` dá a todo perfil acesso ao seu diretório pessoal real.
-
-Isso significa que:
-
-- A configuração Git de um perfil de programação é a mesma configuração Git do perfil de pesquisa;
-- Um perfil de pesquisa pode ler arquivos do diretório do projeto de programação;
-- Credenciais, arquivos e estados locais podem ser compartilhados involuntariamente.
-
-Perfis são isolados por configuração, não pelo sistema operacional.
-
-### Isolamento do Diretório Pessoal
-
-A configuração do modo de diretório pessoal resolve o problema mais comum:
-
-```yaml
-terminal:
-  home_mode: profile
-```
-
-Com `terminal.home_mode: profile`, a execução das ferramentas fica restrita a:
-
-```text
-{HERMES_HOME}/home
-```
-
-Cada perfil recebe:
-
-- Seu próprio `.gitconfig`;
-- Suas próprias chaves SSH;
-- Seu próprio estado do npm;
-- Seu próprio ambiente de execução local.
-
-A desvantagem é que ferramentas como `git` e `gh` precisam ser autenticadas novamente em cada perfil.
-
-### Conflitos de Tokens do Gateway
-
-Conflitos de tokens do gateway são a segunda armadilha.
-
-O gateway de cada perfil precisa de seu próprio token de bot.
-
-Se dois perfis compartilharem um token de bot do Telegram, o segundo gateway recusará a inicialização e apresentará um erro claro.
-
-A correção é criar bots separados para perfis separados.
-
-### Persistência de Sessões
-
-A persistência de sessões é a terceira armadilha.
-
-Um contêiner Docker sem uma montagem de volume perde todas as sessões quando é reiniciado.
-
-A hibernação de um backend serverless perde as sessões ativas até que o ambiente desperte novamente.
-
-Teste a persistência das sessões antes de construir qualquer coisa sobre ela:
-
-1. Inicie uma conversa.
-2. Pare o agente.
-3. Reinicie o agente.
-4. Execute:
-
-```bash
-hermes -c
-```
-
-Se a conversa retornar, a persistência está funcionando.
-
-## O Curador Pode Morder
-
-O curador foi projetado para evitar a deterioração e o acúmulo de habilidades.
-
-Ele arquiva habilidades que não foram usadas durante 90 dias e é executado automaticamente a cada sete dias.
-
-Isso é ótimo para habilidades criadas por agentes que se acumularam a partir de uma dúzia de fluxos de trabalho diferentes.
-
-Porém, é inconveniente quando o curador arquiva uma habilidade que você escreveu e utiliza apenas uma vez por trimestre.
-
-A correção é simples:
-
-```bash
-hermes curator pin <name>
-```
-
-Habilidades fixadas são removidas completamente da jurisdição do curador.
-
-O agente ainda pode modificá-las, mas o curador não pode arquivá-las.
-
-> Fixe qualquer habilidade que você escreveu pessoalmente e deseja manter.
-
-O curador também nunca exclui habilidades automaticamente.
-
-As habilidades arquivadas são movidas para:
-
-```text
-~/.hermes/skills/.archive/
-```
-
-Elas podem ser recuperadas com:
-
-```bash
-hermes curator restore <name>
-```
-
-Se alguma habilidade desaparecer, verifique primeiro o diretório de arquivamento.
-
-## O que Pular
-
----
-
-**Página 43**
-
----
-
-Nem todo recurso do Hermes merece seu tempo no primeiro dia.
-
-Alguns recursos são realmente úteis para casos de uso avançados. Outros são distrações até que você tenha uma necessidade específica.
+Nem tudo precisa entrar na sua operação logo de cara.
 
 ### Servidores MCP
 
-Pule servidores MCP até precisar de uma integração específica.
+Podem ser úteis, mas não precisam estar no dia zero. Se a base ainda está sendo validada, adicionar mais uma camada de integração só aumenta a superfície de falha.
 
-As ferramentas principais já cobrem:
+### Roteamento entre múltiplos provedores
 
-- Web;
-- Terminal;
-- Arquivos;
-- Navegador;
-- Mídia.
+É poderoso, mas também adiciona complexidade cedo demais para muita gente. Primeiro faça um modelo e um provedor funcionarem bem.
 
-MCP adiciona integrações de nicho, como:
+### Processamento em lote
 
-- Jira;
-- Notion;
-- Bancos de dados;
-- Outros serviços especializados.
+Vale muito em alguns cenários, mas não é o melhor ponto de partida se o fluxo principal ainda está instável.
 
-Adicione servidores MCP quando tiver um fluxo de trabalho que realmente exija essas integrações, não antes.
+### Plugins personalizados
 
-### Roteamento entre Múltiplos Provedores
+Entram melhor quando você já sabe exatamente o que precisa estender. Antes disso, o risco é construir uma solução sofisticada para um problema ainda mal definido.
 
-Pule o roteamento entre múltiplos provedores até que seu modelo primário comece a falhar regularmente.
+### Integração ACP com editores
 
-Um único provedor com um único modelo pode funcionar bem durante meses.
+Pode ser excelente depois. Não precisa ser prioridade antes de validar o núcleo operacional.
 
-Adicione provedores alternativos quando limites de taxa, indisponibilidade ou erros recorrentes se tornarem um problema real.
+## Quando não usar o Hermes
 
-### Processamento em Lote
+Essa é uma pergunta boa, e pouca gente faz cedo o suficiente.
 
-Pule o processamento em lote, a menos que esteja:
+### Geração de uso único
 
-- Treinando modelos;
-- Fazendo pesquisa em escala;
-- Processando grandes volumes de tarefas semelhantes.
+Se tudo que você quer é um texto pontual sem contexto, sem ferramenta e sem continuidade, talvez um chat comum já resolva.
 
-O loop padrão do agente lida bem com tarefas individuais.
+### Tarefas que não precisam de ferramentas
 
-O processamento em lote adiciona complexidade para obter uma vazão de que a maioria dos operadores não precisa.
+Nem todo problema pede um agente operacional. Às vezes o valor está só numa resposta rápida.
 
-### Plugins Personalizados
+### Saída determinística
 
-Pule o desenvolvimento de plugins personalizados até que as ferramentas integradas não cubram seu caso de uso.
+Se você precisa de comportamento totalmente fixo, talvez um script dedicado seja melhor do que um loop de agente.
 
-O sistema de plugins é poderoso, mas também exige mais trabalho do que escrever uma habilidade.
+### Aplicações sensíveis à latência
 
-Habilidades cobrem a maioria das necessidades procedimentais sem exigir código.
+O Hermes pensa, usa ferramenta, verifica, volta. Isso é ótimo para qualidade e péssimo para cenários que exigem resposta instantânea e mínima latência.
 
-### Integração ACP com Editores
+## O que se acumula
 
-Pule a integração do editor ACP, a menos que você trabalhe constantemente no VS Code ou no Zed e queira utilizar o Hermes dentro do editor.
+Vale insistir no lado bom também.
 
-A CLI e o gateway cobrem a mesma funcionalidade.
+Quando a base está sólida, algumas coisas realmente se acumulam:
 
-## Quando Não Usar o Hermes
+- memória útil;
+- skills boas;
+- sessões pesquisáveis;
+- automações bem definidas;
+- integrações estáveis;
+- divisão clara de perfis.
 
-Hermes é um agente com uma superfície de ferramentas. Não é a ferramenta certa para todas as tarefas.
+Esse acúmulo é o que faz o Hermes sair do estágio de experimento interessante e virar infraestrutura pessoal ou de equipe.
 
-### Geração de Uso Único
+## Ações recomendadas
 
-Não use Hermes para geração de uso único.
+Se você quer manter a sanidade, comece por aqui:
 
-Se você precisa de uma geração de texto avulsa, como:
+1. valide persistência de sessão;
+2. confirme que as ferramentas essenciais funcionam;
+3. separe perfis quando houver motivo real;
+4. introduza cron e gateways aos poucos;
+5. trate integração externa como algo que vai quebrar algum dia;
+6. faça snapshot do que for importante;
+7. não transforme toda vitória pontual em complexidade permanente.
 
-- Escrever um e-mail;
-- Redigir um tweet;
-- Explicar um conceito;
-- Reformular um parágrafo.
+## Fechamento
 
-Uma chamada direta a um LLM é mais rápida e mais barata.
+A promessa do Hermes não é ser mágico. É ser acumulativo.
 
-O loop do agente adiciona uma sobrecarga desnecessária para uma tarefa que exige apenas uma inferência.
+Mas acúmulo útil depende de base boa, escopo bem escolhido e alguma disciplina para não montar uma máquina mais complicada do que o problema pede.
 
-### Tarefas que Não Precisam de Ferramentas
+Se você respeitar esses limites, o Hermes cresce com você.
+Se ignorar, ele vira exatamente o tipo de sistema que parece poderoso e cansa rápido.
 
-Não use Hermes para tarefas que não precisam de ferramentas.
-
-Por exemplo:
-
-> “Traduza este parágrafo.”
-
-Essa tarefa não precisa de:
-
-- Busca na web;
-- Acesso ao terminal;
-- Ferramentas de arquivo;
-- Navegador;
-- Delegação.
-
-Um chat do ChatGPT ou Claude realiza esse trabalho em menos tempo e com menos sobrecarga.
-
-### Saída Determinística
-
-Não use Hermes quando precisar de uma saída determinística.
-
-O loop do agente é inerentemente não determinístico.
-
-O modelo pode escolher:
-
-- Ferramentas diferentes;
-- Ordens diferentes;
-- Estratégias diferentes;
-- Abordagens diferentes em cada execução.
-
-Para fluxos de trabalho que precisam de resultados reproduzíveis, crie scripts que chamem as ferramentas diretamente em vez de roteá-las pelo agente.
-
-### Aplicações Sensíveis à Latência
-
-Não use Hermes quando a latência for mais importante que a capacidade.
-
-Cada chamada de ferramenta adiciona tempo de ida e volta.
-
-Uma chamada direta de API pode retornar em centenas de milissegundos.
-
-Uma chamada de ferramenta do Hermes adiciona:
-
-1. Tempo de raciocínio do modelo;
-2. Tempo de seleção da ferramenta;
-3. Tempo de execução da ferramenta;
-4. Tempo de interpretação do resultado;
-5. Possíveis chamadas adicionais.
-
-Para aplicações em tempo real, chame a API diretamente.
-
-## O que se Acumula
-
-Os onze artigos anteriores descrevem um sistema que melhora ao longo do tempo:
-
-- A arquitetura do loop do agente;
-- A persistência de sessões;
-- A memória e as habilidades;
-- A superfície de ferramentas;
-- O cron;
-- Os gateways;
-- A delegação;
-- A automação de navegador;
-- O Kanban;
-- Os perfis.
-
----
-
-**Página 44**
-
----
-
-Nada disso funciona se a base estiver errada.
-
-- Sessões que não persistem quebram o ciclo de aprendizado.
-- Chaves de API ausentes quebram a superfície de ferramentas.
-- Tokens de gateway no perfil errado quebram a entrega de mensagens.
-- O curador arquivando uma habilidade que você escreveu quebra uma automação da qual você dependia.
-
-O loop do agente é o motor.
-
-O sistema de aprendizado é o combustível.
-
-As ferramentas são a saída.
-
-Os perfis são o ambiente de execução.
-
-E os limites são o que mantém tudo real.
-
-## Ações Recomendadas
-
-Execute nesta semana:
-
-```bash
-hermes tools
-```
-
-Verifique se toda a sua superfície de ferramentas está disponível.
-
-Fixe as habilidades que você escreveu:
-
-```bash
-hermes curator pin <name>
-```
-
-Teste a persistência das sessões:
-
-```bash
-hermes -c
-```
-
-Antes de adicionar mais recursos, confirme que a base está funcionando.
+Saber a diferença entre esses dois caminhos é, no fundo, o que mantém a sanidade.

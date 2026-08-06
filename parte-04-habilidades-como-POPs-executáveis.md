@@ -1,243 +1,129 @@
-# Parte 04: Habilidades como POPs Executáveis
+# Parte 04: Habilidades como POPs executáveis
 
-Uma habilidade no Hermes é um arquivo Markdown. Só isso.
+Uma skill do Hermes é, no fundo, uma ideia simples com consequências grandes: transformar um jeito de fazer as coisas em procedimento reutilizável.
 
-Um arquivo de texto simples com um cabeçalho YAML e um corpo composto de títulos, marcadores e etapas numeradas. Nada o compila. Nada o transpila. O agente o lê e segue as instruções.
+E o formato disso é quase humilde.
 
-Essa simplicidade é o ponto. Você não precisa de um SDK de plugin, um arquivo de manifesto ou um pipeline de implantação para criar uma habilidade. Você precisa de um editor de texto e de uma opinião sobre como um fluxo de trabalho deve ser executado.
+Não tem SDK complexo. Não tem plugin empacotado. Não tem cerimônia demais. Na maior parte do tempo, uma skill é um arquivo Markdown com frontmatter e instruções claras.
 
-O agente já sabe disso. Ele escreve habilidades para si mesmo depois de concluir tarefas complexas. Ele as carrega quando necessário e as ignora quando não. Ele as atualiza à medida que os fluxos de trabalho evoluem. E, com o curador mantendo tudo organizado, a biblioteca não se degrada em uma pilha de relíquias semimúteis.
+Essa simplicidade é uma vantagem enorme. Ela reduz atrito para escrever, revisar, corrigir e evoluir procedimentos.
 
-Este artigo é sobre como escrever habilidades que realmente funcionem. Não como documentação, mas como procedimentos executáveis que o agente pode executar sem orientação constante.
+## A anatomia de uma boa habilidade
 
-## A Anatomia de uma Boa Habilidade
+Uma boa skill não é um texto bonito. É um texto executável por um agente.
 
-Toda habilidade é um arquivo Markdown localizado em:
+Isso muda o padrão de qualidade. O importante não é soar impressionante. É funcionar quando carregada no meio de uma tarefa real.
 
-```text
-~/.hermes/skills/<category>/<name>/SKILL.md
-```
+### Quando usar
 
-O formato tem duas partes:
+A descrição de gatilho é a primeira parte crítica.
 
-- O **frontmatter** fornece metadados ao agente: um nome, uma descrição de uma linha, uma versão, restrições opcionais de plataforma, tags e categoria.
-- O **corpo** é onde o procedimento fica.
+Ela precisa deixar claro em que situação a skill faz sentido. Se essa condição estiver vaga, o agente pode nunca carregar a skill ou carregar na hora errada.
 
-A descrição é o campo mais importante. É ela que aparece no índice de habilidades que o agente examina no início da sessão. Uma descrição fraca significa que o agente nunca sabe que deve carregar a habilidade.
+Uma descrição boa costuma responder:
 
-O corpo é onde o procedimento fica. A documentação recomenda quatro seções:
-
-### Quando Usar
-
-Esta é a condição de acionamento. É onde você diz ao agente que tipo de solicitação deve acionar esta habilidade.
-
-Seja específico.
-
-> “Quando o usuário pedir para implantar um serviço” é melhor do que “Quando o usuário precisar de ajuda com infraestrutura.”
+- qual problema essa skill resolve;
+- quando ela deve ser usada;
+- que tipo de tarefa ela acelera ou estabiliza.
 
 ### Procedimento
 
-Etapas numeradas que o agente segue.
+Aqui entra o coração da skill.
 
-Cada etapa deve ser uma ação concreta. Se uma etapa exige uma chamada de ferramenta, diga qual ferramenta e quais argumentos. Se uma etapa exige julgamento, diga como o agente deverá decidir.
+O procedimento precisa ser:
+
+- ordenado;
+- específico;
+- verificável;
+- curto o suficiente para ser seguido;
+- completo o suficiente para não depender de adivinhação.
+
+Se a etapa pede um comando, coloque o comando.
+Se pede verificação, diga o que confirmar.
+Se existe uma decisão importante, explicite o critério.
+
+Skill boa reduz improviso.
 
 ### Armadilhas
 
-Modos de falha conhecidos e como evitá-los.
+Essa seção vale ouro.
 
-É aqui que vive o conhecimento tribal.
+Os maiores ganhos não costumam vir da parte feliz do fluxo, mas do que costuma quebrar:
 
-Exemplos:
+- pré-requisito esquecido;
+- sistema operacional com diferença importante;
+- arquivo que vive em lugar não óbvio;
+- comportamento que parece sucesso, mas não é.
 
-- “O servidor de homologação usa a porta 2222, não a 22.”
-- “A API retorna um 202 antes de o recurso estar pronto.”
+Sem essa parte, a skill vira só um resumo otimista do processo.
 
 ### Verificação
 
-Como confirmar que o procedimento funcionou.
+Toda skill útil deveria terminar com alguma forma de checagem.
 
-Pode ser:
+Não basta dizer “feito”. O agente precisa ter como confirmar se aquilo realmente funcionou. Em prática, isso pode ser:
 
-- um comando para executar;
-- uma URL para verificar;
-- um arquivo para inspecionar.
+- um comando de leitura;
+- um teste;
+- uma URL respondendo;
+- um arquivo gerado;
+- um diff aplicado corretamente.
 
-Sem isso, o agente conclui o procedimento sem saber se teve êxito.
+Se não dá para verificar, a skill ainda está crua.
 
-Aqui está um exemplo concreto de uma habilidade bem estruturada:
+## A divulgação progressiva é o motivo de as skills escalarem
 
-O agente lê este arquivo quando a habilidade `deploy-runbook` é carregada. Ele segue as etapas em ordem. Ele verifica as armadilhas antes de prosseguir. Ele verifica o resultado. Ele não precisa que você o conduza pelo fluxo de trabalho todas as vezes.
+Um dos riscos de qualquer sistema baseado em procedimento é a biblioteca crescer demais e virar peso morto.
 
-## A Divulgação Progressiva É o Motivo de as Skills Escalarem
+O Hermes evita isso carregando primeiro só o índice das skills. O conteúdo completo entra no contexto apenas quando necessário.
 
-O agente não carrega todas as skills em todas as conversas. Isso consumiria tokens em fluxos de trabalho que ele nunca usa.
+Esse desenho resolve dois problemas ao mesmo tempo:
 
-No início da sessão, ele carrega um índice compacto:
+- preserva contexto para o que importa agora;
+- permite ter uma biblioteca rica sem pagar o custo total em toda sessão.
 
-- o nome;
-- a descrição;
-- a categoria de cada skill.
+É por isso que dá para acumular bastante conhecimento sem transformar o prompt num depósito de instruções.
 
-São cerca de 3.000 tokens para uma biblioteca de dezenas de skills. O agente lê o índice e sabe o que está disponível sem carregar o conteúdo completo.
+## Execução de várias skills
 
-Quando uma solicitação do usuário corresponde à descrição de uma skill, o agente chama:
+Outro ponto forte é a composição.
 
-```text
-skill_view(name)
-```
+Na vida real, uma tarefa quase nunca é “só GitHub” ou “só testes” ou “só debug”. Normalmente ela mistura peças. O Hermes consegue carregar várias skills ao mesmo tempo e seguir instruções complementares.
 
-Isso carrega o arquivo `SKILL.md` completo.
+Isso é importante porque permite montar workflows por combinação, em vez de tentar escrever uma skill monstruosa para cada cenário possível.
 
-Se a skill faz referência a arquivos de apoio, como modelos, scripts ou documentos de referência, eles são carregados sob demanda com:
+## Pacotes de skills
 
-```text
-skill_view(name, path)
-```
+Quando certos conjuntos aparecem juntos o tempo todo, faz sentido empacotar a convenção.
 
-São três níveis. O agente paga o custo de tokens apenas quando realmente usa a skill. A maioria das skills nunca é carregada na maioria das sessões.
+Pacotes ajudam quando você já sabe que determinado contexto quase sempre pede a mesma combinação de procedimentos. Eles reduzem digitação, evitam esquecimento e deixam o uso mais fluido.
 
-É assim que Hermes pode ser fornecido com dezenas de skills incluídas e ainda caber em uma janela de contexto razoável.
+## Hub de skills
 
-## Execução de Várias Skills
+O hub amplia o sistema para além do que veio instalado por padrão.
 
-Várias skills podem ser executadas juntas em um único comando.
+Isso é útil por dois motivos:
 
-Digite:
+- acelera adoção, porque você não precisa escrever tudo do zero;
+- cria um ecossistema de práticas compartilhadas.
 
-```text
-/github-pr-workflow /test-driven-development fix issue 123
-```
+Mas vale um cuidado: skill de terceiros não deve ser tratada como verdade revelada. Leia, teste e ajuste para o seu contexto.
 
-O agente carrega ambos os arquivos de skill e segue os dois conjuntos de instruções.
+## O que faz as skills se acumularem
 
-Os comandos com barra mais à esquerda são analisados como invocações de skill. A análise para no primeiro token que não é um nome de skill. Assim, argumentos de caminho e nomes de arquivo que por acaso começam com `/` nunca são absorvidos.
+Uma skill boa faz três coisas ao mesmo tempo:
 
-## Pacotes de Skills
+1. economiza contexto;
+2. reduz retrabalho;
+3. captura um jeito de operar que já provou valor.
 
-Pacotes de skills agrupam skills relacionadas em um único atalho.
+No longo prazo, isso pesa muito.
 
-Um pacote `backend-dev` poderia combinar as skills de:
+Sem skill, você continua ensinando o agente repetidas vezes.
+Com skill, você ensina uma vez, melhora quando necessário e reaproveita depois.
 
-- revisão de código;
-- testes;
-- fluxo de trabalho de PR.
+Esse é o momento em que o Hermes começa a sair do modo “assistente que ajuda” e entra no modo “sistema que aprendeu como você trabalha”.
 
-Executar:
-
-```text
-/backend-dev
-```
-
-carrega as três de uma vez.
-
-Pacotes são apenas arquivos YAML que listam nomes de skills. Eles não substituem skills individuais. Em vez disso, são aliases para combinações que você usa constantemente.
-
-## Hub de Skills
-
-O Hub de Skills é onde a comunidade publica skills.
-
-Você navega com:
-
-```bash
-hermes skills browse
-```
-
-Pesquisa com:
-
-```bash
-hermes skills search <keyword>
-```
-
-Inspeciona antes de instalar com:
-
-```bash
-hermes skills inspect
-```
-
-E instala com:
-
-```bash
-hermes skills install
-```
-
-O hub cobre várias fontes:
-
-- skills opcionais oficiais do Hermes;
-- o diretório `skills.sh` da Vercel;
-- endpoints conhecidos de sites de documentação;
-- repositórios GitHub diretos.
-
-Cada instalação do hub passa por um scanner de segurança que verifica:
-
-- exfiltração de dados;
-- injeção de prompt;
-- comandos destrutivos.
-
-Para equipes que desejam compartilhar skills internas, os taps permitem publicar um repositório GitHub de arquivos `SKILL.md`.
-
-Os membros da equipe adicionam o tap com:
-
-```bash
-hermes skills tap add <org/repo>
-```
-
-Depois, instalam skills individuais a partir dele.
-
-Sem cadastro em registro, sem servidor e sem pipeline.
-
-## O Que Faz as Skills se Acumularem
-
-O agente cria skills automaticamente após concluir tarefas complexas.
-
-Quando resolve um problema novo com cinco ou mais chamadas de ferramenta, ele salva o fluxo de trabalho como uma skill. Na próxima vez, carrega essa skill e executa mais rápido. Na vez seguinte, lembra que a skill existe sem ser solicitado.
-
-Você cria skills para os fluxos de trabalho que já internalizou:
-
-- o runbook de implantação que você escreveu;
-- a lista de verificação de resposta a incidentes;
-- os padrões de revisão de código.
-
-O agente não precisa aprender isso do zero. Ele os tem como um arquivo que lê e segue.
-
-O curador impede que a biblioteca cresça para sempre.
-
-- Skills não usadas por 30 dias tornam-se obsoletas.
-- Sem uso por 90 dias, são arquivadas.
-
-O curador nunca exclui. Skills arquivadas ficam em:
-
-```text
-~/.hermes/skills/.archive/
-```
-
-Elas podem ser recuperadas com:
-
-```bash
-hermes curator restore <name>
-```
-
-Skills críticas são fixadas com:
-
-```bash
-hermes curator pin
-```
-
-Assim, são removidas inteiramente da jurisdição do curador.
-
-O efeito de acumulação é simples: cada skill que você adiciona ou corrige torna o agente mais rápido naquele fluxo de trabalho específico.
-
-Não em tudo. Naquela única coisa.
-
-Uma biblioteca de 20 skills bem escritas, cada uma cobrindo um fluxo de trabalho que você realmente executa, torna o agente dramaticamente mais útil do que uma biblioteca de 100 vagas que nunca são carregadas.
-
-Skills são a camada em que você molda diretamente como o agente se comporta.
-
-Não por meio de configuração, mas por meio de procedimentos que você escreve uma vez e o agente executa daí em diante.
-
-Essa é a diferença entre dizer ao agente o que fazer todas as vezes e ensiná-lo o que fazer uma vez.
-
-Skills são a camada de formalização.
-
-A memória guarda os fatos. As skills guardam os procedimentos. Juntas, cobrem a maior parte do que o agente precisa para ser útil.
-
-Nenhuma delas importa se o agente não consegue alcançar as ferramentas necessárias para executar o procedimento.
+A memória guarda fatos.
+As skills guardam procedimentos.
+Juntas, elas formam a base prática do acúmulo.

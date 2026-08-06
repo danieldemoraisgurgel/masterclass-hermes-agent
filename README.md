@@ -140,14 +140,6 @@ Por isso, o valor do material está menos em comandos isolados e mais em entende
 
 Este repositório inclui o arquivo [LICENSE](./LICENSE). Consulte o texto da licença para os detalhes de uso.
 
-## Autor
-
-Conteúdo organizado no repositório de:
-Daniel de Morais Gurgel
-
-GitHub:
-https://github.com/danieldemoraisgurgel
-
 ---
 
 Se este material te ajudar, vale a pena começar pela Parte 01 e seguir em ordem até a Parte 12. A série foi construída para ir do entendimento do núcleo do Hermes até sua operação real em ambiente, automação e escala.

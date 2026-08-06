@@ -1,339 +1,217 @@
-# Parte 02: As Escolhas Que se Acumulam
+# Parte 02: As escolhas que se acumulam
 
-A maioria das pessoas passa sua primeira hora com o Hermes escolhendo um provedor e executando o instalador.
+Quando alguém instala o Hermes pela primeira vez, costuma gastar energia demais em coisas que parecem grandes e energia de menos nas coisas que realmente vão cobrar a conta depois.
 
-Ambas as coisas importam. Nenhuma delas, porém, é a decisão que continuará importando daqui a um mês.
+Escolher o provedor importa. Rodar o instalador certo também.
 
-As escolhas que se acumulam são três:
+Mas, passado o entusiasmo do primeiro dia, as decisões que continuam pesando são outras:
 
-- **Onde seu agente fica?**
-- **Ele persiste sessões entre reinicializações?**
-- **Ele realmente consegue usar suas ferramentas?**
+- onde o agente vive;
+- se as sessões persistem de verdade;
+- se ele consegue usar as ferramentas que você espera.
 
-Acertar isso no primeiro dia torna tudo depois mais fácil.
-
-Errar isso significa passar o próximo mês se perguntando por que o ciclo de aprendizado nunca parece entrar em ação.
+Se essa base estiver certa, o resto encaixa. Se estiver errada, o Hermes até parece funcionar, mas nunca engrena de verdade.
 
 ## Onde o agente fica?
 
-O Hermes é executado em seis backends de terminal:
-
-- Local
-- Docker
-- SSH
-- Daytona
-- Modal
-- Singularity
-
-Cada um muda a forma como você interage com o agente.
+O Hermes pode rodar em vários backends. Cada um muda a experiência prática de uso.
 
 ### Ambiente local
 
-A área de trabalho local é o ponto de partida mais comum.
+Para muita gente, o ambiente local é o melhor começo.
 
-O Hermes Desktop é instalado como um aplicativo nativo no macOS e no Windows, gerencia sua própria configuração, sessões e ambiente Python, e simplesmente funciona.
+Você instala, conversa com o agente, testa as ferramentas e entende o sistema sem depender de infraestrutura extra. É o jeito mais rápido de pegar intimidade com o fluxo.
 
-As sessões persistem no SQLite. A memória é gravada no disco. O agente está sempre disponível quando sua máquina está ligada.
+As vantagens são claras:
 
-A contrapartida é que seu agente morre com seu laptop.
+- setup simples;
+- resposta imediata;
+- fácil de depurar;
+- sessões e memória gravadas na própria máquina.
 
-Feche a tampa e o Hermes fica em silêncio.
+A limitação também é clara: se seu laptop dorme, o agente dorme junto.
+
+Isso é ótimo para aprendizado e uso pessoal. É ruim para qualquer cenário em que você queira disponibilidade contínua.
 
 ### Docker
 
-Docker é para pessoas que querem que o agente sobreviva a reinicializações e trocas de laptop.
+Docker entra quando você quer estabilidade operacional.
 
-A imagem oficial mapeia:
+Nesse modelo, o Hermes deixa de morar no seu laptop e passa a viver em um ambiente mais previsível, normalmente com um volume persistente mapeado para guardar:
 
-```text
-~/.hermes
-```
+- configuração;
+- sessões;
+- skills;
+- memória;
+- credenciais de integração.
 
-para:
+A grande vantagem aqui é simples: você pode atualizar a imagem, recriar o contêiner e continuar de onde parou, desde que o diretório de dados esteja bem montado.
 
-```text
-/opt/data
-```
-
-dentro do contêiner.
-
-Esse único volume contém:
-
-- Configuração
-- Sessões
-- Habilidades
-- Memórias
-- Credenciais do gateway
-
-Você pode baixar uma nova imagem, destruir o contêiner e iniciar outro usando o mesmo diretório de dados sem perder nada.
-
-A configuração Docker executa o Hermes como um serviço de gateway supervisionado.
-
-O agente vive no seu servidor, não no seu laptop.
-
-Esse é o modelo certo quando você quer que ele converse com Telegram ou Discord 24 horas por dia, sete dias por semana.
+Se você pretende usar gateway, cron e acesso remoto com consistência, Docker costuma ser o primeiro salto realmente útil.
 
 ### Daytona e Modal
 
-Daytona e Modal são as opções sem servidor.
+Daytona e Modal funcionam bem quando o objetivo é elasticidade, custo sob controle e execução sob demanda.
 
-Seu ambiente hiberna quando está ocioso e quase não custa nada.
+O ambiente sobe, faz o trabalho e pode hibernar depois. Isso é excelente para:
 
-O ciclo é simples:
+- tarefas em lote;
+- pesquisas pontuais;
+- automações que não exigem presença contínua;
+- experimentos com backend remoto.
 
-1. Inicie o ambiente.
-2. Execute o trabalho.
-3. Coloque o ambiente em hibernação.
-
-Essas opções são ótimas para trabalhos em lote e cargas de trabalho de pesquisa.
-
-Não são ideais para um agente conversacional que precisa estar acessível pelo Telegram a qualquer hora.
+O que eles não resolvem tão bem é a ideia de “meu agente está sempre de pé esperando mensagem”. Se o ambiente dorme, o Hermes fica indisponível até acordar.
 
 ### SSH e Singularity
 
-SSH e Singularity preenchem lacunas específicas.
+Essas opções atendem casos mais específicos.
 
-O SSH é a escolha certa quando você tem uma máquina remota potente e quer que o agente execute comandos nela.
+SSH faz sentido quando você já tem uma máquina remota forte e quer executar o Hermes nela sem muita cerimônia.
 
-O Singularity atende a ambientes de HPC e computação científica.
+Singularity aparece mais em ambientes de HPC, laboratório e computação científica, onde a forma de empacotar e isolar software é diferente do universo Docker tradicional.
 
 ## Padrão recomendado de adoção
 
-O padrão que vi funcionar para a maioria das pessoas é:
+Se eu fosse resumir uma rota sensata para a maioria das pessoas, seria esta:
 
-1. Começar localmente para aprender o sistema.
-2. Adicionar Docker ou um backend de nuvem quando quiser que o agente funcione de modo independente.
-3. Conectar gateways para poder acessá-lo de qualquer lugar.
+1. comece localmente para entender o comportamento do agente;
+2. valide memória, sessões e ferramentas;
+3. mova para Docker ou um backend remoto quando quiser persistência e disponibilidade melhores;
+4. só depois conecte gateways e automações mais sérias.
 
-Onde o agente vai executar determina o quanto o Hermes estará disponível para você.
-
----
+Pular direto para a configuração “mais completa” parece produtivo, mas costuma gerar uma pilha de problemas difíceis de diagnosticar.
 
 ## Persistência de sessões
 
-Toda conversa com o Hermes é salva como uma sessão.
+Toda conversa útil com o Hermes precisa poder continuar depois.
 
-As sessões são armazenadas em um banco de dados SQLite localizado em:
+As sessões normalmente vivem em um banco SQLite, em algo como:
 
 ```text
 ~/.hermes/state.db
 ```
 
-As sessões:
+É esse banco que permite:
 
-- Recebem títulos.
-- Possuem busca de texto completo por meio do FTS5.
-- Acompanham a linhagem entre eventos de compressão.
-- Podem ser pesquisadas pelo agente.
-- Podem ser retomadas.
-- Podem ser transferidas entre plataformas.
+- retomar conversas;
+- pesquisar sessões antigas;
+- manter linhagem após compressão;
+- transformar histórico em contexto reutilizável.
 
-Essa é a infraestrutura que faz o ciclo de aprendizado funcionar.
-
-Sem persistência de sessão, toda conversa começa do zero e o agente não tem como construir sobre trabalhos anteriores.
-
-É aqui que a escolha de implantação importa.
+Sem persistência, o Hermes vira um ótimo improvisador com amnésia.
 
 ### Persistência no ambiente local
 
-Na área de trabalho local, as sessões persistem por padrão.
+No ambiente local, isso costuma vir pronto.
 
-O banco de dados SQLite fica no seu diretório inicial e sobrevive a reinicializações.
-
-Você pode se afastar de uma conversa, voltar uma semana depois e retomá-la de onde parou usando:
-
-```bash
-hermes -c
-```
-
-Também é possível retomar uma sessão pelo seu identificador.
+Você conversa hoje, fecha tudo, volta depois e retoma a sessão. É simples e funciona bem, desde que o diretório do perfil continue existindo e você não trate o ambiente como descartável.
 
 ### Persistência no Docker
 
-No Docker, o banco de dados de sessão fica dentro do volume montado.
+No Docker, persistência depende de configuração correta.
 
-Desde que você monte:
+Se o volume estiver bem montado, tudo bem. Se não estiver, cada reinício pode parecer um “novo Hermes” sem lembrança nenhuma do que aconteceu antes.
 
-```text
-~/.hermes
-```
-
-em:
-
-```text
-/opt/data
-```
-
-as sessões sobreviverão a:
-
-- Reinicializações do contêiner
-- Atualizações da imagem
-- Substituições completas do contêiner
-
-Esse comportamento não é automático.
-
-Se você esquecer a montagem do volume, o agente começará do zero todas as vezes, com um armazenamento de sessão vazio.
-
-A documentação do Docker deixa isso claro, mas é o tipo de coisa que muitas pessoas só percebem quando o agente esquece a conversa do dia anterior.
+Esse é um erro comum porque o sistema pode até responder normalmente. O problema só aparece quando você tenta voltar para uma sessão antiga e descobre que ela sumiu.
 
 ### Persistência no Daytona e no Modal
 
-Em backends sem servidor, como Daytona e Modal, o ambiente hiberna quando está ocioso.
+Nesses ambientes, o estado pode sobreviver enquanto o workspace ou volume estiver preservado. O ponto não é se o backend é “bom” ou “ruim”, e sim se ele combina com sua expectativa de disponibilidade.
 
-O estado do agente hiberna junto com o ambiente.
-
-As sessões são retomadas quando o ambiente desperta, mas o agente não fica acessível durante a hibernação.
-
-Isso é adequado para trabalhos cron agendados.
-
-Não é adequado quando você quer chamar o agente pelo Telegram e obter uma resposta em tempo real.
+Se você quer cron, lote e execução periódica, ótimo.
+Se quer um agente acessível a qualquer momento via mensagem, pense duas vezes.
 
 ## Teste de persistência
 
-A persistência de sessão é invisível quando funciona e catastrófica quando não funciona.
+Persistência boa é invisível. Persistência ruim só aparece quando já atrapalhou.
 
-Teste sua configuração da seguinte maneira:
+Então vale testar cedo:
 
-1. Inicie uma conversa.
-2. Pare o agente.
-3. Reinicie o agente.
-4. Execute:
+1. inicie uma conversa real;
+2. feche o agente;
+3. abra novamente;
+4. rode:
 
 ```bash
 hermes -c
 ```
 
-Se a conversa voltar, está tudo certo.
-
-Se o agente começar do zero, corrija o armazenamento antes de construir qualquer coisa sobre ele.
-
----
+Se a conversa reaparecer, ótimo.
+Se não reaparecer, pare tudo e corrija isso antes de continuar.
 
 ## O erro que quase todo mundo comete no primeiro dia
 
-Aqui está o erro que quase todo mundo comete no primeiro dia.
+Quase todo mundo faz um teste fácil demais.
 
-As pessoas fazem ao Hermes uma pergunta conversacional, como:
+Pergunta algo como:
 
-> Escreva um poema sobre IA.
+> escreva um poema sobre IA
 
 ou:
 
-> Explique computação quântica.
+> me explique como funciona um banco vetorial
 
-O agente responde, a conversa parece boa e elas assumem que tudo está funcionando.
+O agente responde. A pessoa conclui que está tudo certo.
 
-Esse teste prova que o modelo funciona.
+Só que isso testa conversa, não operação.
 
-Ele não prova que o agente funciona.
-
----
+Você ainda não sabe se o Hermes consegue usar terminal, ler arquivos, navegar, persistir sessão ou recuperar contexto. E essas são justamente as partes que diferenciam o sistema.
 
 ## Testando a superfície de ferramentas
 
-O que torna o Hermes diferente do ChatGPT é a superfície de ferramentas.
-
-Se as ferramentas não estiverem conectadas, você pagou por um chatbot com etapas extras.
-
-O teste que realmente importa é pedir ao agente para fazer algo que exija uma ferramenta.
-
-Eu recomendaria um teste de fumaça dividido em três partes.
+Se você quer um teste honesto, ele precisa tocar a máquina.
 
 ### 1. Teste da ferramenta de terminal
 
-Peça para o agente executar um comando de terminal.
+Peça algo verificável, por exemplo:
 
-Por exemplo:
-
-> Qual é o uso do meu disco?
+> rode `pwd` e me diga em que diretório você está
 
 ou:
 
-> Mostre-me os últimos cinco arquivos modificados no meu projeto.
+> liste a versão do Python disponível
 
-Se ele executar o comando e retornar uma saída real, a ferramenta de terminal está funcionando.
+Se o agente conseguir executar e devolver o resultado real, o terminal está vivo.
 
 ### 2. Teste da ferramenta de pesquisa na web
 
-Peça para o agente pesquisar na web.
+Peça uma consulta factual e atual.
 
-Por exemplo:
-
-> Encontre as últimas notícias sobre um assunto atual e resuma-as em três itens.
-
-Se ele realizar a pesquisa e retornar resultados ao vivo, a ferramenta da web está funcionando.
+Se a ferramenta existir e estiver configurada, o Hermes deve conseguir buscar e citar o que encontrou, não apenas inventar uma resposta plausível.
 
 ### 3. Teste da ferramenta de arquivos
 
-Peça para o agente salvar algo em um arquivo.
+Crie um arquivo simples, leia de volta e confirme o conteúdo.
 
-Por exemplo:
-
-> Escreva a data de hoje em um arquivo chamado `test.txt` e diga-me o caminho absoluto.
-
-Se o arquivo aparecer no disco, as ferramentas de arquivo estão funcionando.
+Esse teste parece banal, mas diz muito. Um agente que não consegue tocar no sistema de arquivos fica preso na camada de descrição.
 
 ## Critério de aprovação
 
-Se os três testes passarem, o agente está funcional.
+Seu Hermes está realmente pronto quando consegue fazer três coisas ao mesmo tempo:
 
-Você pode seguir para:
+- manter sessão entre reinicializações;
+- executar ferramentas que mexem no mundo real;
+- voltar com o resultado certo, não com uma aproximação verbal.
 
-- Memória
-- Habilidades
-- Cron
-- Gateways
-- Automações
-- Demais recursos
-
-Se algum teste falhar, corrija-o antes de fazer qualquer outra coisa.
-
-Uma chave de API ausente ou um backend mal configurado poderá frustrá-lo por semanas se você não perceber o problema cedo.
-
----
+Se um desses pontos falhar, a fundação ainda não está pronta.
 
 ## Orçamento de iterações
 
-O orçamento de iterações existe por um motivo.
+Outra escolha que se acumula é o orçamento de iterações.
 
-O padrão é de **150 turnos**.
+Um agente com orçamento curto demais desiste cedo.
+Um agente com orçamento longo demais pode gastar contexto e tokens em espirais bobas.
 
-Cada chamada de ferramenta conta como um turno.
-
-Se sua primeira tarefa real exigir dez chamadas de ferramentas, isso representará dez dos seus 150 turnos.
-
-Portanto, elabore o teste de fumaça para comprovar que a superfície de ferramentas funciona, não para esgotar o orçamento.
-
----
+O ponto não é buscar o “máximo”. É achar um limite compatível com o tipo de trabalho que você espera: tarefas simples pedem menos; investigação, debug e automação longa pedem mais fôlego.
 
 ## Conclusão
 
-As três escolhas são:
+Se você lembrar de uma coisa desta parte, que seja esta:
 
-1. Morada de implantação
-2. Persistência de sessão
-3. Verificação das ferramentas
+o Hermes não começa a ficar realmente útil quando responde bem. Ele começa a ficar útil quando persiste, executa e volta.
 
-Elas não são a parte mais empolgante da configuração do Hermes.
+Sessões persistentes dão continuidade.
+Ferramentas funcionais dão capacidade.
+A escolha de ambiente dá sustentação.
 
-São a parte mais importante.
-
-Um agente local com sessões persistentes e ferramentas funcionais é uma plataforma sobre a qual você pode construir.
-
-Cada habilidade adicionada, cada trabalho cron agendado e cada memória acumulada pelo agente passa a se apoiar em uma base estável.
-
-Um agente que perde sessões ao reiniciar, não consegue acessar a web ou vive em um laptop que é fechado todas as noites nunca desenvolverá o efeito cumulativo.
-
-Ele sempre parecerá apenas um chatbot.
-
-Porque, sem essas três coisas se mantendo estáveis, é exatamente isso que ele é.
-
-Acerte a base e o restante da série fará sentido.
-
-Ignore essa base e tudo o que for descrito daqui em diante parecerá que quase funciona, mas nunca se encaixa completamente.
-
-Sessões e ferramentas dão memória ao agente.
-
-Mas memória sem estrutura é apenas uma pilha de fatos.
-
-**Fique ligado!**
+É isso que faz o sistema se acumular de verdade.
