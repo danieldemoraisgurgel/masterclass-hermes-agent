@@ -301,11 +301,11 @@ Elabore os prompts para aproveitar essa capacidade.
 
 ## Existe um orçamento de iterações
 
-O orçamento padrão é de 90 turnos.
+O orçamento padrão é de 150 turnos.
 
 Cada chamada de ferramenta conta como um turno.
 
-Uma tarefa complexa que exige 15 chamadas de ferramentas consome 15 dos 90 turnos disponíveis.
+Uma tarefa complexa que exige 15 chamadas de ferramentas consome 15 dos 150 turnos disponíveis.
 
 Os subagentes recebem orçamentos próprios e independentes, normalmente limitados a 50 turnos.
 
