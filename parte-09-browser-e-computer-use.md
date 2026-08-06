@@ -6,7 +6,7 @@ Todas as ferramentas desta série até agora foram baseadas em texto:
 - A busca na web retorna texto.
 - Até mesmo o sistema de cron funciona com entrada e saída em texto.
 
-A automação de navegador e o Computer Use rompem esse padrão.
+A automação de Navegador e o Computer Use rompem esse padrão.
 
 A ferramenta de navegador navega em sites reais, clica em botões, preenche formulários e interage com páginas web. A ferramenta de Computer Use controla uma área de trabalho real, clicando, digitando, rolando e arrastando em sistemas macOS, Windows e Linux.
 
