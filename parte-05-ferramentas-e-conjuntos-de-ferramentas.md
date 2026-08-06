@@ -506,7 +506,7 @@ Com uma superfície de ferramentas funcional, o agente pode agir sobre o mundo.
 
 # Teste de Fumaça Essencial
 
-O primeiro teste de fumaça apresentado no Artigo 2 continua sendo a etapa de verificação mais importante para qualquer instalação do Hermes.
+O primeiro teste de fumaça apresentado no 'Parte 2' continua sendo a etapa de verificação mais importante para qualquer instalação do Hermes.
 
 O teste utiliza três chamadas de ferramentas, cobrindo:
 
