@@ -1,4 +1,4 @@
-# Parte 07: Gateways de Mensagens Tornam Hermes Ambiente
+# Parte 07: Gateways de Mensagens Criam o Ambiente Hermes
 
 Tudo nesta série, até agora, pressupôs que você está sentado diante de um teclado:
 
