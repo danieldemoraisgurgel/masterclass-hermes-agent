@@ -1,5 +1,4 @@
-# Parte 09: Navegador e Uso de Computador
-
+# Parte 09: Browser e Computer Use
 Todas as ferramentas desta série até agora foram baseadas em texto:
 
 - O terminal executa comandos e retorna texto.
