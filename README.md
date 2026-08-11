@@ -4,9 +4,6 @@ Um guia em português, direto ao ponto, para entender como o Hermes Agent funcio
 
 Este repositório organiza a masterclass em 12 partes independentes, mas pensadas para serem lidas em sequência. A ideia é sair da visão superficial de “um chatbot com ferramentas” e enxergar o Hermes como aquilo que ele realmente é: um loop de agente com memória, habilidades, ferramentas, automação, gateways, delegação, coordenação e administração.
 
-Repositório original do projeto:
-https://github.com/danieldemoraisgurgel/masterclass-hermes-agent
-
 ## Para quem este material é
 
 Este conteúdo é especialmente útil para quem quer:
