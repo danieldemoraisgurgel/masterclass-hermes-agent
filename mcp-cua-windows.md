@@ -12,7 +12,7 @@
 Hermes Gateway (Linux / VPS)
   └─ MCP stdio: windows-cua
        └─ wrapper /root/.hermes/bin/windows-cua-mcp
-            └─ SSH via Tailscale → danie@100.116.151.102
+            └─ SSH via Tailscale → danie@100.116.151.102 (login e IP utilizados como exemplo)
                  └─ cua-driver mcp --socket \\.\pipe\cua-driver
                       └─ cua-driver serve na sessão gráfica Windows (Session 1+)
 ```
