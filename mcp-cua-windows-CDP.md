@@ -1,12 +1,23 @@
-# Tutorial: controlar o Windows pelo Hermes remoto com CUA via MCP sobre SSH
+# Tutorial: CUA remoto no Windows via Tailscale — desktop e DevTools
 
-> **Cenário:** gateway Hermes em um VPS Linux e área de trabalho Windows acessada pela tailnet Tailscale.
+> **Cenário:** o Hermes Desktop conversa com um gateway Linux/VPS. O gateway alcança o Windows pela tailnet Tailscale e usa SSH para falar com o `cua-driver` da sessão gráfica interativa.
 >
-> **Resultado:** o gateway chama o `cua-driver` no Windows por SSH, mas as ações de interface são executadas na sessão gráfica interativa do usuário Windows — não na Session 0 do serviço SSH.
+> **Objetivo:** primeiro habilitar o controle remoto do desktop Windows. Em seguida, quando necessário, expor com segurança o DevTools do Edge para que o mesmo gateway controle o navegador remotamente.
+
+## Visão geral
+
+Este tutorial tem duas partes independentes, mas a segunda depende da primeira:
+
+1. **Parte 1 — desktop Windows:** configura o `windows-cua` para listar janelas, abrir aplicativos e interagir com a interface gráfica real do Windows.
+2. **Parte 2 — navegador via DevTools:** mantém o CUA da Parte 1 e acrescenta um endpoint CDP do Edge, publicado somente pelo Tailscale, para navegar e inspecionar abas com o browser route do CUA.
+
+> O SSH executa comandos na Session 0. O `cua-driver` é o componente que encaminha as ações para a sessão gráfica do usuário; sem ele, a automação não enxerga janelas reais.
 
 ---
 
-## 1. Arquitetura final
+# Parte 1 — Controle remoto da área de trabalho Windows
+
+## 1. Arquitetura e fluxo
 
 ```text
 Hermes Gateway (Linux / VPS)
@@ -21,7 +32,7 @@ O gateway não usa o `computer_use` nativo para controlar o Windows, pois esse t
 
 ---
 
-## 2. Pré-requisitos
+## 2. Pré-requisitos da Parte 1
 
 - VPS Linux com Hermes Agent configurado.
 - Máquina Windows conectada à mesma tailnet.
@@ -34,7 +45,7 @@ O gateway não usa o `computer_use` nativo para controlar o Windows, pois esse t
 
 ---
 
-## 3. Preparar o CUA no Windows
+## 3. Preparar o `cua-driver` no Windows
 
 No PowerShell da sessão gráfica do Windows:
 
@@ -99,7 +110,7 @@ timeout 5 bash -c '</dev/tcp/100.116.151.102/22'
 
 ---
 
-## 5. Autorizar a chave SSH do VPS
+## 5. Autorizar a chave SSH do gateway
 
 A chave pública do VPS deve ser adicionada ao OpenSSH do Windows.
 
@@ -152,7 +163,7 @@ ssh -i /root/.ssh/id_rsa -o IdentitiesOnly=yes -o BatchMode=yes \
 
 ---
 
-## 6. Criar o wrapper MCP no VPS
+## 6. Criar o wrapper MCP no gateway
 
 Arquivo criado no VPS: `/root/.hermes/bin/windows-cua-mcp`
 
@@ -181,7 +192,7 @@ bash -n /root/.hermes/bin/windows-cua-mcp
 
 ---
 
-## 7. Registrar o MCP no Hermes do VPS
+## 7. Registrar o MCP no Hermes
 
 ```bash
 hermes mcp add windows-cua \
@@ -210,7 +221,7 @@ O Hermes informa que uma **nova sessão** deve ser iniciada para que os tools MC
 
 ---
 
-## 8. Teste técnico direto pelo SSH
+## 8. Validar o controle remoto do desktop
 
 Exemplo para confirmar que o processo SSH encaminha chamadas ao daemon da sessão gráfica:
 
@@ -224,9 +235,13 @@ A validação retornou janelas reais da sessão Windows, incluindo Hermes, Power
 
 ---
 
-## 9. Edge DevTools e rede Tailscale
+# Parte 2 — Controle remoto do navegador via DevTools
 
-### Iniciar o Edge com um perfil isolado
+A Parte 2 só deve ser configurada depois que a Parte 1 estiver funcional. Ela não substitui o CUA: acrescenta o DevTools Protocol do Edge para operações semânticas de navegador, como navegar, capturar o estado da aba e interagir com elementos da página.
+
+## 1. Iniciar o Edge e publicar o DevTools pelo Tailscale
+
+### 1.1 Iniciar o Edge com um perfil isolado
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' `
@@ -249,7 +264,7 @@ netstat -ano | findstr :9222
 
 O resultado esperado é `127.0.0.1:9222 LISTENING`. Isso é o loopback do Windows.
 
-### Publicar a porta somente pelo Tailscale
+### 1.2 Publicar a porta somente pelo Tailscale
 
 O gateway Linux usa `100.79.185.92`; o Windows usa `100.116.151.102`.
 
@@ -300,7 +315,7 @@ Remove-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
 
 > Não exponha `9222` em `0.0.0.0` sem firewall restrito: DevTools pode controlar abas, cookies e sessões.
 
-### Alternativa: túnel SSH
+### 1.3 Alternativa: túnel SSH
 
 ```bash
 ssh -L 9222:127.0.0.1:9222 danie@100.116.151.102
@@ -310,7 +325,7 @@ Use então `http://127.0.0.1:9222/json/list` no gateway.
 
 ---
 
-## 10. Autorização e binding pelo `windows-cua`
+## 2. Autorizar e fazer binding do navegador
 
 1. Execute `list_windows` para obter o PID e `window_id` atuais.
 2. Após autorização explícita, chame `browser_prepare` com `strategy: {kind: existing_profile}`.
@@ -327,46 +342,46 @@ browser_prepare → get_browser_state → browser_navigate → novo snapshot
 
 ---
 
-## 11. Prompts executados durante a configuração
+## 3. Prompts de validação e uso
 
-### Descoberta inicial pelo `windows-edge-devtools`
+### 3.1 Descoberta inicial pelo `windows-edge-devtools`
 
 ```text
 Use only the MCP server windows-edge-devtools. List the currently open browser pages, select the page whose URL begins with edge://inspect/, and take a screenshot. Report the exact screenshot file path, page index, and URL; do not navigate, click, type, or modify any page.
 ```
 
-### Tentativa de iniciar o Edge
+### 3.2 Tentativa de iniciar o Edge
 
 ```text
 pode tentar com o comando "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222 --user-data-dir="C:\Temp\HermesEdgeCDP"
 ```
 
-### Usar o MCP CUA
+### 3.3 Usar o MCP CUA
 
 ```text
 tenta usando o mcp do windows-cua
 ```
 
-### Validar com a Calculadora antes do Edge
+### 3.4 Validar com a Calculadora antes do Edge
 
 ```text
 tente novamente com o mcp do windows-cua
 antes abra a caculadora pra validar que esta funcionando e depois execute o & "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222 --user-data-dir="C:\Temp\HermesEdgeCDP"
 ```
 
-### Abrir o Google
+### 3.5 Abrir o Google
 
 ```text
 abra o google.com
 ```
 
-### Autorizar o perfil Edge existente
+### 3.6 Autorizar o perfil Edge existente
 
 ```text
 eu autorizo a inspecao DevTools desse perfil isolado.
 ```
 
-### Validar o Endpoint DevTools no navegador aberto
+### 3.7 Validar o Endpoint DevTools no navegador aberto
 
 ```text
 abra agora entao o google.com para validar o Endpoint DevTools via windows cua , com o navegador que ja esta aberto
@@ -374,7 +389,7 @@ abra agora entao o google.com para validar o Endpoint DevTools via windows cua ,
 
 Resultado confirmado: `https://www.google.com/`, binding exato, `mutation_allowed=true` e snapshot pós-navegação válido.
 
-### Prompts de uso diário
+### 3.8 Prompts de uso diário
 
 ```text
 Use o MCP windows-cua para abrir a Calculadora no meu Windows.
@@ -390,7 +405,9 @@ Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp
 
 ---
 
-## 12. Diagnóstico rápido
+# Diagnóstico e validação
+
+## Diagnóstico rápido
 
 - `browser_binding_stale`: redescubra PID e `window_id` com `list_windows`.
 - `browser_consent_required`: solicite autorização explícita.
@@ -408,7 +425,7 @@ Get-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
 
 ---
 
-## 13. Validação de uma instalação real
+## Estado validado de uma instalação real
 
 > **Validação executada em 2026-08-23 09:25 (-03:00).** Os identificadores e IPs abaixo pertencem a esta instalação; trate-os como exemplo e revalide-os em outro ambiente.
 
@@ -488,7 +505,7 @@ O endpoint só está operacional quando os dois testes HTTP retornarem JSON vál
 
 ---
 
-## 14. Skills incorporadas
+# Apêndice — Skills incorporadas
 
 As skills usadas na configuração estão mantidas no Hermes e reproduzidas abaixo.
 
@@ -674,7 +691,7 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 
 ---
 
-## 15. Checklist operacional
+## Checklist operacional
 
 - [ ] Sessão gráfica Windows ativa.
 - [ ] `cua-driver status` e `cua-driver doctor` OK.
