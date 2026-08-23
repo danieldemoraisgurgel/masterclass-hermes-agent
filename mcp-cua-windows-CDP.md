@@ -1,4 +1,4 @@
-# Tutorial: CUA remoto no Windows via Tailscale — desktop e DevTools
+# Tutorial: CUA remoto no Windows via Tailscale — Desktop e DevTools
 
 > **Cenário:** o Hermes Desktop conversa com um gateway Linux/VPS. O gateway alcança o Windows pela tailnet Tailscale e usa SSH para falar com o `cua-driver` da sessão gráfica interativa.
 >
