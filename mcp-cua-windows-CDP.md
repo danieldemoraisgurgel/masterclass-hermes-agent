@@ -408,7 +408,87 @@ Get-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
 
 ---
 
-## 13. Skills incorporadas
+## 13. Validação de uma instalação real
+
+> **Validação executada em 2026-08-23 09:25 (-03:00).** Os identificadores e IPs abaixo pertencem a esta instalação; trate-os como exemplo e revalide-os em outro ambiente.
+
+### VPS Linux / gateway Hermes
+
+Foi confirmado:
+
+```text
+MCP windows-cua: enabled
+Transporte: stdio → /root/.hermes/bin/windows-cua-mcp
+Teste do MCP: conectado
+Tools descobertas: 57
+Permissão do wrapper: 700
+IP Tailscale do gateway: 100.79.185.92
+SSH para Windows: OK
+```
+
+### Windows remoto
+
+Foi confirmado:
+
+```text
+IP Tailscale: 100.116.151.102
+OpenSSH (sshd): Running
+cua-driver: 0.21.0
+Autostart: registered (running)
+Sessão interativa: console / danie / ID 2 / Ativo
+IP Helper (iphlpsvc): Running
+```
+
+O CUA retornou janelas reais da sessão interativa, incluindo Hermes, Edge Beta e PowerShell. Isso confirma que o daemon não está preso à Session 0 do SSH.
+
+### Portproxy e firewall
+
+A regra aplicada foi confirmada como:
+
+```text
+100.116.151.102:9222 → 127.0.0.1:9222
+Firewall remoto permitido: 100.79.185.92
+```
+
+O listener no IP Tailscale estava presente. Contudo, **isso não prova que o backend DevTools do Edge esteja ativo**.
+
+Durante esta validação, o gateway recebeu `Connection reset by peer` ao consultar:
+
+```text
+http://100.116.151.102:9222/json/version
+http://100.116.151.102:9222/json/list
+```
+
+A mesma checagem local no Windows para `http://127.0.0.1:9222/json/version` não conectou. Os processos Edge em execução usavam o perfil padrão e nenhum apresentava `--remote-debugging-port=9222`.
+
+**Interpretação:** o portproxy, o firewall e o listener Tailscale estavam corretos, mas não havia uma instância Edge DevTools atendendo em `127.0.0.1:9222` naquele instante. Inicie ou reinicie a instância isolada antes de testar o endpoint:
+
+```powershell
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' `
+  -ArgumentList '--remote-debugging-port=9222','--user-data-dir=C:\Temp\HermesEdgeCDP'
+```
+
+Depois, valide nesta ordem:
+
+```powershell
+# Windows: backend real do Edge
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:9222/json/version
+
+# Windows: portproxy e firewall
+netsh interface portproxy show all
+Get-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
+```
+
+```bash
+# VPS: caminho completo pelo Tailscale
+curl --connect-timeout 8 --max-time 12   http://100.116.151.102:9222/json/version
+```
+
+O endpoint só está operacional quando os dois testes HTTP retornarem JSON válido.
+
+---
+
+## 14. Skills incorporadas
 
 As skills usadas na configuração estão mantidas no Hermes e reproduzidas abaixo.
 
@@ -594,7 +674,7 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 
 ---
 
-## 14. Checklist operacional
+## 15. Checklist operacional
 
 - [ ] Sessão gráfica Windows ativa.
 - [ ] `cua-driver status` e `cua-driver doctor` OK.
