@@ -19,6 +19,10 @@ Este tutorial tem duas partes independentes, mas a segunda depende da primeira:
 
 ## 1. Arquitetura e fluxo
 
+![Diagrama da arquitetura: Hermes Gateway, MCP windows-cua, SSH/Tailscale e cua-driver na sessão gráfica do Windows](assets/windows-cua-tailscale-architecture.png)
+
+> A imagem resume o caminho de controle: Hermes Gateway → MCP `windows-cua` → wrapper SSH → Tailscale → `cua-driver` → sessão gráfica do Windows.
+
 ```text
 Hermes Gateway (Linux / VPS)
   └─ MCP stdio: windows-cua
