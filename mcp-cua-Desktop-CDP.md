@@ -114,9 +114,48 @@ timeout 5 bash -c '</dev/tcp/100.116.151.102/22'
 
 ---
 
-## 5. Autorizar a chave SSH do gateway
+## 5. Criar e autorizar a chave SSH do gateway
 
-A chave pública do VPS deve ser adicionada ao OpenSSH do Windows.
+Esta etapa envolve **duas máquinas**. A regra é simples:
+
+| Onde executar | O que fazer |
+|---|---|
+| **Gateway Linux/VPS** | Criar e guardar o par de chaves SSH. A chave privada fica somente aqui. |
+| **Windows remoto** | Autorizar somente a chave pública do gateway no OpenSSH. |
+
+> **Nunca copie `~/.ssh/id_rsa` para o Windows.** A chave privada é a credencial do gateway. Apenas o conteúdo de `~/.ssh/id_rsa.pub` deve ser copiado para o Windows.
+
+### 5.1 Criar ou validar a chave no gateway Linux/VPS
+
+No terminal da **VPS que executa o Hermes**, execute:
+
+```bash
+install -d -m 700 ~/.ssh
+
+# Cria uma chave RSA de 3072 bits apenas se ela ainda não existir.
+if [ ! -f ~/.ssh/id_rsa ]; then
+  ssh-keygen -t rsa -b 3072 \
+    -f ~/.ssh/id_rsa \
+    -C "hermes-gateway@$(hostname)" \
+    -N ""
+fi
+
+chmod 600 ~/.ssh/id_rsa
+chmod 644 ~/.ssh/id_rsa.pub
+ssh-keygen -lf ~/.ssh/id_rsa.pub
+```
+
+Para copiar a chave pública, exiba **somente** este arquivo no gateway e cole seu conteúdo no Windows durante a próxima seção:
+
+```bash
+cat ~/.ssh/id_rsa.pub
+```
+
+Nesta instalação, a chave do gateway já existe em `/root/.ssh/id_rsa`, está com permissão `600` e sua chave pública está em `/root/.ssh/id_rsa.pub`.
+
+### 5.2 Autorizar a chave pública no Windows
+
+No Windows, abra o **PowerShell da conta que receberá o acesso SSH**. Para editar o arquivo global de administradores, abra-o como Administrador.
 
 ### Conta Windows comum
 
@@ -124,7 +163,8 @@ Para uma conta que **não** é administradora, use:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\.ssh" | Out-Null
-# Adicione a chave pública do VPS em $HOME\.ssh\authorized_keys
+notepad "$HOME\.ssh\authorized_keys"
+# Cole uma única linha completa do arquivo id_rsa.pub do gateway, salve e feche.
 ```
 
 Em seguida, aplique ACLs restritas:
@@ -148,7 +188,8 @@ O OpenSSH ignora `C:\Users\danie\.ssh\authorized_keys` e exige o arquivo global.
 
 ```powershell
 $keyPath = Join-Path $env:ProgramData 'ssh\administrators_authorized_keys'
-# Grave a chave pública do VPS em $keyPath
+notepad $keyPath
+# Cole uma única linha completa do arquivo id_rsa.pub do gateway, salve e feche.
 icacls $keyPath /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F'
 Restart-Service sshd
 ```
