@@ -645,7 +645,40 @@ cua-driver mcp --socket \\.\pipe\cua-driver      ← apenas se conecta ao daemon
 
 Portanto, não adicione `--grant existing-profile` ao wrapper `/root/.hermes/bin/windows-cua-mcp`. Adicione-o ao `cua-driver serve` iniciado pelo Scheduled Task do autostart no Windows.
 
-### 1.1 Corrigir o Scheduled Task do autostart
+### 1.1 Habilitar o opt-in no Hermes Agent
+
+No perfil do Hermes que utilizará o tool nativo `computer_use`, execute:
+
+```bash
+hermes config set computer_use.grant_existing_profile true
+```
+
+Confirme o valor resolvido:
+
+```bash
+hermes config get computer_use.grant_existing_profile
+```
+
+O resultado esperado é:
+
+```text
+true
+```
+
+Esse opt-in faz o Hermes iniciar o runtime nativo do `computer_use` com o grant confiável `--grant existing-profile`. Ele continua obrigatório em modo `standard` e também em YOLO/unrestricted; desativar aprovações não substitui a autorização de perfil existente.
+
+> Esse comando não eleva o processo para Administrador/UAC e não concede permissões genéricas sobre o Windows. Ele autoriza especificamente o acesso a um perfil Chromium já conectado. Além disso, o `computer_use` nativo atua na máquina onde seu runtime está executando. Neste tutorial, o Windows remoto é alcançado pelo MCP `windows-cua`; portanto, o opt-in do Hermes não substitui a configuração do daemon remoto descrita na próxima seção.
+
+As duas camadas ficam assim:
+
+| Camada | Configuração necessária |
+|---|---|
+| Hermes `computer_use` nativo | `hermes config set computer_use.grant_existing_profile true` |
+| Daemon remoto usado pelo MCP `windows-cua` | `cua-driver serve --permission-mode standard --grant existing-profile` |
+
+Depois de alterar a configuração, inicie uma nova sessão do Hermes para que o runtime seja lançado com o novo grant.
+
+### 1.2 Corrigir o Scheduled Task do autostart
 
 No PowerShell elevado do Windows pt-BR, execute primeiro o autostart normal:
 
@@ -719,7 +752,7 @@ O `status` deve indicar que o daemon está em execução no pipe `\\.\pipe\cua-d
 
 > Não use `--dangerously-bypass-approvals` apenas para resolver este erro. O modo `standard` com `--grant existing-profile` concede somente a fronteira necessária para anexar um perfil Chromium existente. Para automação não assistida com escopo estrito, use como alternativa avançada o modo `bounded` com um capability manifest revisado e aprovado que declare `kind: existing_profile`, o executável exato do Edge e os tools/origens necessários.
 
-### 1.2 Por que o navegador isolado também foi recusado
+### 1.3 Por que o navegador isolado também foi recusado
 
 O erro sobre não encontrar um executável Chromium protegido e assinado pertence à estratégia `isolated_new`. Nessa estratégia, o CUA só pode lançar uma instalação de Chrome, Edge ou Chromium cuja identidade e localização sejam aceitas pela plataforma. Um executável portátil, copiado para uma pasta do usuário ou não reconhecido como instalação protegida falha de forma segura.
 
@@ -909,7 +942,7 @@ Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp
 ## Diagnóstico rápido
 
 - `browser_binding_stale`: redescubra PID e `window_id` com `list_windows`.
-- `browser_consent_required`: a autorização no chat não basta; reinicie o daemon com `serve --permission-mode standard --grant existing-profile` e repita `browser_prepare`.
+- `browser_consent_required`: confirme `hermes config get computer_use.grant_existing_profile`, reinicie a sessão Hermes e, para o MCP remoto, reinicie o daemon com `serve --permission-mode standard --grant existing-profile`; depois repita `browser_prepare`.
 - `browser_route_unavailable`: confirme Edge/Chrome suportado, PID e `window_id` atuais e use `existing_profile` autorizado.
 - `background_unavailable`: tente background uma vez; depois use `foreground` apenas se o CUA recomendar.
 
@@ -1206,6 +1239,7 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 - [ ] Edge escuta na porta 9222.
 - [ ] Portproxy aponta o IP Tailscale para `127.0.0.1:9222`.
 - [ ] Firewall permite apenas `100.79.185.92`.
+- [ ] `hermes config get computer_use.grant_existing_profile` retorna `true` no perfil que usa o `computer_use` nativo.
 - [ ] Scheduled Task inicia `cua-driver serve --permission-mode standard --grant existing-profile`.
 - [ ] Daemon foi reiniciado depois da alteração do grant.
 - [ ] `browser_prepare` retornou `endpoint_access_class=existing_profile_approved`.
