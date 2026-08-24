@@ -946,6 +946,94 @@ Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp
 - `browser_route_unavailable`: confirme Edge/Chrome suportado, PID e `window_id` atuais e use `existing_profile` autorizado.
 - `background_unavailable`: tente background uma vez; depois use `foreground` apenas se o CUA recomendar.
 
+### Recuperar `browser_route_unavailable` sem depender de `isolated_new`
+
+Se o diagnóstico informar simultaneamente que não existe janela do Edge e que o lançamento `isolated_new` não encontrou um Chromium protegido e assinado, corrija primeiro o ciclo de vida do navegador. O grant não cria uma janela e não inicia um endpoint sozinho.
+
+No PowerShell da **sessão gráfica interativa do Windows** — console, RDP ou PowerShell aberto pelo CUA da Session 1+; não use um `Start-Process` executado diretamente pela sessão SSH/Session 0 — valide o Edge oficial:
+
+```powershell
+$edgeCandidates = @(
+    'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
+    'C:\Program Files\Microsoft\Edge\Application\msedge.exe'
+)
+
+$edge = $edgeCandidates |
+    Where-Object { Test-Path $_ } |
+    Select-Object -First 1
+
+if (-not $edge) {
+    throw 'Microsoft Edge não foi encontrado em Program Files.'
+}
+
+Get-Item $edge | Select-Object FullName, Length, VersionInfo
+Get-AuthenticodeSignature $edge |
+    Select-Object Status, @{Name='Signer';Expression={$_.SignerCertificate.Subject}}
+```
+
+O resultado deve mostrar `Status: Valid` e assinatura da Microsoft. Um executável portátil, copiado para uma pasta do usuário ou com assinatura inválida não deve ser usado.
+
+Inicie um Edge separado na sessão gráfica. Este perfil é separado do perfil pessoal, mas será anexado pelo CUA como `existing_profile`:
+
+```powershell
+$profile = 'C:\Temp\HermesEdgeCDP'
+New-Item -ItemType Directory -Force $profile | Out-Null
+
+Start-Process `
+    -FilePath $edge `
+    -ArgumentList @(
+        '--remote-debugging-port=9222',
+        '--remote-debugging-address=127.0.0.1',
+        '--force-renderer-accessibility',
+        "--user-data-dir=$profile",
+        'https://www.google.com/'
+    )
+```
+
+Prove o endpoint **local** antes de testar portproxy, firewall ou gateway:
+
+```powershell
+Start-Sleep -Seconds 3
+
+Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" |
+    Where-Object { $_.CommandLine -like '*HermesEdgeCDP*' } |
+    Select-Object ProcessId, CommandLine
+
+Get-NetTCPConnection -LocalPort 9222 -State Listen |
+    Select-Object LocalAddress, LocalPort, OwningProcess
+
+Invoke-RestMethod http://127.0.0.1:9222/json/version
+Invoke-RestMethod http://127.0.0.1:9222/json/list
+```
+
+Se `127.0.0.1:9222/json/version` falhar, ainda não existe CDP utilizável. Não tente o IP remoto: revise o processo, os argumentos e se o diretório `C:\Temp\HermesEdgeCDP` está bloqueado por uma instância antiga.
+
+Somente depois do endpoint local responder, valide a publicação pelo IP Tailscale do Windows:
+
+```powershell
+Get-Service iphlpsvc
+netsh interface portproxy show all
+Get-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
+```
+
+No gateway, teste:
+
+```bash
+curl --fail --max-time 10 \
+  http://100.116.151.102:9222/json/version
+```
+
+Uma conexão resetada pelo IP remoto enquanto o endpoint local não responde normalmente significa que o portproxy recebeu a conexão, mas não encontrou listener em `127.0.0.1:9222`.
+
+Por fim, não solicite `isolated_new` nesse fluxo. No mesmo transporte MCP e com uma sessão estável:
+
+1. execute `list_windows` e selecione a janela real do Edge;
+2. use o PID e `window_id` atuais em `browser_prepare` com `strategy: {kind: existing_profile}`;
+3. chame imediatamente `get_browser_state`;
+4. exija `endpoint_access_class: existing_profile_approved`, `binding_quality: exact` e `mutation_allowed: true`.
+
+No Windows/Edge pt-BR, o adaptador de setup de perfil existente pode recusar controles internos localizados que não reconheça. Iniciar previamente o Edge com `--remote-debugging-port=9222` evita depender dessa etapa visual, mas não elimina a exigência do grant de runtime.
+
 ```powershell
 query session
 cua-driver status
