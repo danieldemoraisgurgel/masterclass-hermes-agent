@@ -21,6 +21,7 @@
   - [Iniciar Edge e publicar DevTools](#2-iniciar-o-edge-separado-e-publicar-o-devtools-pelo-tailscale)
   - [Binding do navegador](#3-preparar-e-fazer-binding-do-navegador)
   - [Prompts de validação e uso](#4-prompts-de-validação-e-uso)
+  - [Teste final manual do laboratório](#49-teste-final-manual-end-to-end-do-laboratório)
   - [Diagnóstico e recuperação](#diagnóstico-rápido)
 - [Checklist operacional](#checklist-operacional)
 - [Referências](#referências)
@@ -954,6 +955,32 @@ Use o MCP windows-cua para listar as janelas abertas no Windows.
 ```text
 Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp.
 ```
+
+### 4.9 Teste final manual end-to-end do laboratório
+
+Use o prompt abaixo para uma validação manual completa. Os IPs e usuários deste bloco são valores de um laboratório específico; preserve-os ao testar esse laboratório e não os confunda com os valores Tailscale usados nos exemplos principais do tutorial.
+
+```text
+Implementar o cua remoto para compute use (desktop e devtools), em seguida instalar as skills.
+Windows: 10.85.36.96 (usuário: daniel)
+Linux (VPS) 10.85.36.95 (usuario: root)
+
+Autenticação SSH por chave já configurada nos dois sentidos.
+Implementar tudo de acordo com a documentação github.com/danieldemoraisgurgel/masterclass-hermes-agent/blob/main/extras/mcp-cua-Desktop-CDP.md
+
+Executar a Calculadora via Cua Windows e calcular 2+2.
+
+Executar o CDP DevTools via Cua Windows, conecte-se ao navegador e acesse google.com, informar dados de estatisticas do navegador no carregamento do site, como tamanho, latência, validade do ssl.
+
+Ao final, exiba os dados e confirme que a calculadora foi aberta utilizando o CUA e os dados do navegador, via Endpoint CDP.
+```
+
+**Critérios de aceitação do teste:**
+
+1. `list_windows` confirma uma janela real da Calculadora e o resultado visível de `2 + 2 = 4`.
+2. A validação de CDP inclui `/json/list` com uma aba `type: page` e `webSocketDebuggerUrl`, além de `browser_prepare` e `get_browser_state` com binding exato.
+3. O relatório informa apenas métricas observadas no CDP — por exemplo, tamanho transferido, tempos de rede disponíveis e informações TLS/SSL expostas pelo navegador. Se algum dado não puder ser obtido, o relatório deve dizer explicitamente `indisponível`, com o motivo; nunca estimar ou inventar métricas.
+4. O resultado final diferencia claramente a prova da Calculadora via CUA da prova da aba/navegação via endpoint CDP.
 
 ---
 
