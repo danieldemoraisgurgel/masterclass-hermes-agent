@@ -960,15 +960,15 @@ Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp
 
 ### 4.9 Teste final manual end-to-end do laboratório
 
-Use o prompt abaixo para uma validação manual completa. Os IPs e usuários deste bloco são valores de um laboratório específico; preserve-os ao testar esse laboratório e não os confunda com os valores Tailscale usados nos exemplos principais do tutorial.
+Use o prompt abaixo para uma implantação e validação. Os IPs e usuários deste bloco são valores de um laboratório específico; altere-os na sua configuração e não os confunda com os valores Tailscale usados nos exemplos principais do tutorial.
 
 ```text
 Implemente o CUA remoto para `computer_use` (desktop e DevTools) e, em seguida, instale as skills.
-Windows: <IP> (usuário: daniel)
+Windows:     <IP> (usuário: daniel)
 Linux (VPS): <IP> (usuário: root)
 
 Autenticação SSH por chave já configurada nos dois sentidos.
-Implementar tudo de acordo com a documentação github.com/danieldemoraisgurgel/masterclass-hermes-agent/blob/main/extras/mcp-cua-Desktop-CDP.md
+Utilizar a documentação como referencia para o processo github.com/danieldemoraisgurgel/masterclass-hermes-agent/blob/main/extras/mcp-cua-Desktop-CDP.md
 
 Execute a Calculadora via CUA no Windows e calcule 2+2.
 Execute o CDP DevTools via CUA no Windows, conecte-se ao navegador, acesse `google.com` e informe dados estatísticos do carregamento do site, como tamanho, latência e validade do SSL.
