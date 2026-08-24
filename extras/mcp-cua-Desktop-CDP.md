@@ -315,6 +315,55 @@ Os SIDs usados pela alternativa global são:
 - `S-1-5-32-544`: grupo local Administradores;
 - `S-1-5-18`: `SYSTEM`.
 
+### 5.2.1 Corrigir o arquivo criado como `authorized_keys.txt`
+
+Se `notepad $keyPath` abriu ou salvou como `authorized_keys.txt`, isso normalmente aconteceu porque o arquivo sem extensão ainda não existia. O OpenSSH **não lê `authorized_keys.txt`**: ele procura exatamente:
+
+```text
+C:\Users\danie\.ssh\authorized_keys
+```
+
+Use o procedimento abaixo no PowerShell do usuário Windows que receberá o SSH. Primeiro, copie para a área de transferência do Windows a única linha exibida na VPS por:
+
+```bash
+cat /root/.ssh/id_rsa.pub
+```
+
+Depois, no Windows, execute:
+
+```powershell
+$sshDir = Join-Path $env:USERPROFILE '.ssh'
+$keyPath = Join-Path $sshDir 'authorized_keys'
+$txtPath = Join-Path $sshDir 'authorized_keys.txt'
+New-Item -ItemType Directory -Force $sshDir | Out-Null
+
+# Grava a chave exatamente no arquivo usado pelo OpenSSH, sem extensão.
+$publicKey = (Get-Clipboard -Raw).Trim()
+Set-Content -Path $keyPath -Value $publicKey -NoNewline -Encoding ascii
+
+# Mantém também uma cópia .txt apenas para conferência/backup.
+Copy-Item -Path $keyPath -Destination $txtPath -Force
+
+$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+icacls $sshDir /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
+icacls $keyPath /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
+
+Write-Host "Arquivo usado pelo OpenSSH: $keyPath"
+Write-Host "Copia de conferencia:       $txtPath"
+```
+
+Confirme que os dois arquivos têm a mesma chave e que o arquivo principal realmente não possui extensão:
+
+```powershell
+Get-Item $keyPath, $txtPath | Select-Object FullName, Length
+Get-Content -Path $keyPath
+Get-Content -Path $txtPath
+```
+
+O arquivo relevante para o login é `C:\Users\danie\.ssh\authorized_keys`. O arquivo `authorized_keys.txt` pode existir, mas é ignorado pelo OpenSSH e não corrige o erro `Permission denied (publickey)`.
+
+> Se `Get-Clipboard -Raw` não estiver disponível, cole manualmente a linha da chave no Notepad aberto pelo caminho exato `$keyPath`. No diálogo **Salvar como**, selecione `Todos os arquivos (*.*)` e confirme que o nome é `authorized_keys`, não `authorized_keys.txt`.
+
 ### 5.3 Validar a autenticação SSH a partir da VPS
 
 Na primeira conexão, confirme a impressão digital do host Windows e aceite-a somente se ela tiver sido verificada por um canal confiável. Isso grava o host em `~/.ssh/known_hosts` e permite que o wrapper use `StrictHostKeyChecking=yes`:
