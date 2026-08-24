@@ -22,6 +22,7 @@
   - [Binding do navegador](#3-preparar-e-fazer-binding-do-navegador)
   - [Prompts de validação e uso](#4-prompts-de-validação-e-uso)
   - [Teste final manual do laboratório](#49-teste-final-manual-end-to-end-do-laboratório)
+  - [Reprodução detalhada do Edge/DevTools](#reprodução-detalhada-do-edgedevtools)
   - [Diagnóstico e recuperação](#diagnóstico-rápido)
 - [Checklist operacional](#checklist-operacional)
 - [Referências](#referências)
@@ -798,7 +799,7 @@ O nome “perfil separado” neste tutorial significa separado do perfil pessoal
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' `
-  -ArgumentList '--remote-debugging-port=9222','--user-data-dir=C:\Temp\HermesEdgeCDP'
+  -ArgumentList '--remote-debugging-address=0.0.0.0','--remote-debugging-port=9222','--user-data-dir=C:\Temp\HermesEdgeCDP'
 ```
 
 Forma equivalente com o operador `&`:
@@ -815,7 +816,7 @@ Verifique o listener local:
 netstat -ano | findstr :9222
 ```
 
-O resultado esperado é `127.0.0.1:9222 LISTENING`. Isso é o loopback do Windows.
+O resultado esperado é `0.0.0.0:9222 LISTENING`. O Edge fica disponível em todas as interfaces; por isso, mantenha uma regra de firewall restrita ao gateway Tailscale autorizado.
 
 ### 2.2 Publicar a porta somente pelo Tailscale
 
@@ -866,7 +867,7 @@ netsh interface portproxy delete v4tov4 `
 Remove-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
 ```
 
-> Não exponha `9222` em `0.0.0.0` sem firewall restrito: DevTools pode controlar abas, cookies e sessões.
+> O fluxo deste tutorial inicia o Edge com `--remote-debugging-address=0.0.0.0`. Nunca mantenha a porta `9222` liberada amplamente: DevTools pode controlar abas, cookies e sessões. A regra de firewall deve restringir o acesso ao IP Tailscale autorizado do gateway.
 
 ### 2.3 Alternativa: túnel SSH
 
@@ -1029,7 +1030,7 @@ Start-Process `
     -FilePath $edge `
     -ArgumentList @(
         '--remote-debugging-port=9222',
-        '--remote-debugging-address=127.0.0.1',
+        '--remote-debugging-address=0.0.0.0',
         '--force-renderer-accessibility',
         "--user-data-dir=$profile",
         'https://www.google.com/'
@@ -1047,7 +1048,7 @@ Não chame `launch_app` apontando para `msedge.exe` com `--remote-debugging-*` e
 Exemplo de comando a codificar:
 
 ```powershell
-Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList @('--remote-debugging-port=9222','--remote-debugging-address=127.0.0.1','--force-renderer-accessibility','--user-data-dir=C:\Temp\HermesEdgeCDP','https://www.google.com/')
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList @('--remote-debugging-port=9222','--remote-debugging-address=0.0.0.0','--force-renderer-accessibility','--user-data-dir=C:\Temp\HermesEdgeCDP','https://www.google.com/')
 ```
 
 No gateway Linux, gere o valor sem executar o Edge localmente:
@@ -1055,7 +1056,7 @@ No gateway Linux, gere o valor sem executar o Edge localmente:
 ```python
 import base64
 
-command = r"""Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList @('--remote-debugging-port=9222','--remote-debugging-address=127.0.0.1','--force-renderer-accessibility','--user-data-dir=C:\Temp\HermesEdgeCDP','https://www.google.com/')"""
+command = r"""Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList @('--remote-debugging-port=9222','--remote-debugging-address=0.0.0.0','--force-renderer-accessibility','--user-data-dir=C:\Temp\HermesEdgeCDP','https://www.google.com/')"""
 encoded = base64.b64encode(command.encode("utf-16le")).decode()
 print(encoded)
 ```
@@ -1232,7 +1233,7 @@ A mesma checagem local no Windows para `http://127.0.0.1:9222/json/version` não
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' `
-  -ArgumentList '--remote-debugging-port=9222','--user-data-dir=C:\Temp\HermesEdgeCDP'
+  -ArgumentList '--remote-debugging-address=0.0.0.0','--remote-debugging-port=9222','--user-data-dir=C:\Temp\HermesEdgeCDP'
 ```
 
 Depois, valide nesta ordem:
@@ -1438,6 +1439,12 @@ Report only effects verified by CUA readback: Calculator window, Edge PID/title/
 See `references/edge-cua-reproduction.md` for the tested sequence and representative result shapes.
 
 </details>
+
+---
+
+## Reprodução detalhada do Edge/DevTools
+
+O procedimento reproduzível, com o lançamento obrigatório do Edge usando `--remote-debugging-address=0.0.0.0`, está em [edge-cua-reproduction.md](edge-cua-reproduction.md). Execute primeiro a validação local do endpoint e mantenha a regra de firewall limitada ao gateway Tailscale autorizado.
 
 ---
 
