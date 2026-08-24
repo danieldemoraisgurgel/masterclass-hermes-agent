@@ -33,7 +33,7 @@
 Este tutorial tem duas partes independentes, mas a segunda depende da primeira:
 
 1. **Parte 1 — desktop Windows:** configura o `windows-cua` para listar janelas, abrir aplicativos e interagir com a interface gráfica real do Windows.
-2. **Parte 2 — navegador via DevTools:** mantém o CUA da Parte 1 e acrescenta um endpoint CDP do Edge, publicado somente pelo Tailscale, para navegar e inspecionar abas com o browser route do CUA.
+2. **Parte 2 — navegador via DevTools:** mantém o CUA da Parte 1 e acrescenta um endpoint CDP do Edge, publicado somente pelo Tailscale, para navegar e inspecionar abas pela rota de navegador do CUA.
 
 > O SSH executa comandos na Session 0. O `cua-driver` é o componente que encaminha as ações para a sessão gráfica do usuário; sem ele, a automação não enxerga janelas reais.
 
@@ -58,7 +58,7 @@ Hermes Gateway (Linux / VPS)
                       └─ cua-driver serve na sessão gráfica Windows (Session 1+)
 ```
 
-O gateway não usa o `computer_use` nativo para controlar o Windows, pois esse tool nativo permanece no host Linux. O MCP `windows-cua` expõe os tools do CUA que rodam no Windows: `list_windows`, `get_window_state`, `click`, `type_text`, `press_key`, `launch_app` e outros.
+O gateway não usa o `computer_use` nativo para controlar o Windows, pois essa ferramenta nativa permanece no host Linux. O MCP `windows-cua` expõe as ferramentas do CUA que rodam no Windows: `list_windows`, `get_window_state`, `click`, `type_text`, `press_key`, `launch_app` e outras.
 
 ---
 
@@ -108,7 +108,7 @@ Se o cliente CUA reportar algo semelhante a:
 incompatible daemon: contract version 0.6.0 does not match SDK 0.7.0
 ```
 
-recrie a tarefa autostart usando a versão atual do binário:
+Recrie a tarefa de inicialização automática usando a versão atual do binário:
 
 ```powershell
 $driver = 'C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe'
@@ -378,9 +378,9 @@ Get-Content C:\ProgramData\ssh\administrators_authorized_keys
 ssh-keygen -lf C:\ProgramData\ssh\administrators_authorized_keys
 ```
 
-A primeira saída deve começar com `ssh-rsa`, `ssh-ed25519` ou `ecdsa-sha2-`. A segunda deve retornar um fingerprint `SHA256:...` sem erro.
+A primeira saída deve começar com `ssh-rsa`, `ssh-ed25519` ou `ecdsa-sha2-`. A segunda deve retornar uma impressão digital `SHA256:...` sem erro.
 
-### 5.3 Validar fingerprint e autenticação VPS → Windows
+### 5.3 Validar a impressão digital e a autenticação VPS → Windows
 
 Não avance para o MCP sem comprovar que a chave pública instalada no Windows corresponde à chave privada usada pela VPS.
 
@@ -403,7 +403,7 @@ Na VPS:
 ssh-keygen -lf /root/.ssh/id_rsa.pub
 ```
 
-Os fingerprints `SHA256:...` retornados no Windows e na VPS devem ser iguais. Se forem diferentes, não teste o MCP: corrija primeiro o arquivo de chaves autorizadas.
+As impressões digitais `SHA256:...` retornadas no Windows e na VPS devem ser iguais. Se forem diferentes, não teste o MCP: corrija primeiro o arquivo de chaves autorizadas.
 
 Na primeira conexão, confirme a impressão digital do host Windows por um canal confiável. Isso grava o host em `~/.ssh/known_hosts`:
 
@@ -426,7 +426,7 @@ ssh -i /root/.ssh/id_rsa \
 echo $?
 ```
 
-Só prossiga se o resultado for `0`. Se aparecer `Permission denied (publickey)`, confira `C:\ProgramData\ssh\administrators_authorized_keys`, o fingerprint, as ACLs e o bloco `Match Group administrators`.
+Só prossiga se o resultado for `0`. Se aparecer `Permission denied (publickey)`, confira `C:\ProgramData\ssh\administrators_authorized_keys`, a impressão digital, as ACLs e o bloco `Match Group administrators`.
 
 ---
 
@@ -508,13 +508,13 @@ nano /root/.ssh/authorized_keys
 # Cole a linha completa de C:\Users\danie\.ssh\hermes_gateway.pub, salve e feche.
 ```
 
-Valide o fingerprint na VPS:
+Valide a impressão digital na VPS:
 
 ```bash
 ssh-keygen -lf /root/.ssh/authorized_keys
 ```
 
-O fingerprint da entrada `hermes-desktop@windows-100.116.151.102` deve ser igual ao mostrado no Windows por `ssh-keygen -lf ...hermes_gateway.pub`.
+A impressão digital da entrada `hermes-desktop@windows-100.116.151.102` deve ser igual à mostrada no Windows por `ssh-keygen -lf ...hermes_gateway.pub`.
 
 ### 6.3 Testar Windows → gateway antes do Hermes Desktop
 
@@ -656,7 +656,7 @@ A Parte 2 só deve ser configurada depois que a Parte 1 estiver funcional. Ela n
 
 ## 1. Autorizar o runtime do CUA para usar um perfil existente
 
-O acesso a um perfil Chromium já iniciado pode expor cookies e sessões autenticadas. Por isso, o Cua Driver exige uma autorização definida **quando o runtime é iniciado**.
+O acesso a um perfil Chromium já iniciado pode expor cookies e sessões autenticadas. Por isso, o CUA Driver exige uma autorização definida **quando o runtime é iniciado**.
 
 Uma autorização escrita no prompt, a aprovação comum de uma chamada MCP ou um argumento enviado pelo agente não substituem esse grant. O modo de permissão fica imutável durante a vida do daemon.
 
@@ -671,7 +671,7 @@ Portanto, não adicione `--grant existing-profile` ao wrapper `/root/.hermes/bin
 
 ### 1.1 Habilitar o opt-in no Hermes Agent
 
-No perfil do Hermes que utilizará o tool nativo `computer_use`, execute:
+No perfil do Hermes que utilizará a ferramenta nativa `computer_use`, execute:
 
 ```bash
 hermes config set computer_use.grant_existing_profile true
@@ -1437,7 +1437,7 @@ Edge normally listens on `127.0.0.1:9222`. To reach it from the Linux gateway wi
 
 Report only effects verified by CUA readback: Calculator window, Edge PID/title/window, endpoint preparation status, exact browser binding, and tab URL/title. Distinguish `typed/sent` from `effect: confirmed`; an `unverifiable` input is not proof the command ran. Do not claim a page was opened through CDP merely because Edge opened: prove it through `browser_prepare` + exact `get_browser_state` binding.
 
-See `references/edge-cua-reproduction.md` for the tested sequence and representative result shapes.
+Consulte a **Parte 4 — Reprodução detalhada do Edge/DevTools** para ver a sequência testada e os formatos representativos de resultado.
 
 </details>
 
