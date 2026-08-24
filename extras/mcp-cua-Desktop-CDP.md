@@ -23,6 +23,8 @@
   - [Prompts de validação e uso](#4-prompts-de-validação-e-uso)
   - [Teste final manual do laboratório](#49-teste-final-manual-end-to-end-do-laboratório)
   - [Diagnóstico e recuperação](#diagnóstico-rápido)
+- [Parte 3 — Apêndice: Skills incorporadas](#parte-3--apêndice-skills-incorporadas)
+- [Parte 4 — Reprodução detalhada do Edge/DevTools](#parte-4--reprodução-detalhada-do-edgedevtools)
 - [Checklist operacional](#checklist-operacional)
 - [Referências](#referências)
 
@@ -1255,7 +1257,7 @@ O endpoint só está operacional quando os dois testes HTTP retornarem JSON vál
 
 ---
 
-# Apêndice — Skills incorporadas
+# Parte 3 — Apêndice: Skills incorporadas
 
 As skills usadas na configuração estão mantidas no Hermes e reproduzidas abaixo.
 
@@ -1441,7 +1443,7 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 
 ---
 
-## Reprodução detalhada do Edge/DevTools
+# Parte 4 — Reprodução detalhada do Edge/DevTools
 
 Este roteiro reproduz o fluxo do Edge controlado pelo MCP `windows-cua` a partir de um gateway Linux. Ele usa um perfil separado, mas o CUA o anexa como `existing_profile`.
 
