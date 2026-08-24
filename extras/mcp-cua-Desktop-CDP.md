@@ -1094,6 +1094,39 @@ curl --fail --max-time 10 \
   http://100.116.151.102:9222/json/version
 ```
 
+#### Validar diretamente as abas e o WebSocket CDP remoto
+
+Não use um extrator de páginas para esta etapa: `/json/list` responde JSON de protocolo, não uma página HTML. Consulte o endpoint diretamente a partir do gateway:
+
+```bash
+curl --fail --silent --show-error --max-time 10 \
+  http://100.116.151.102:9222/json/list
+```
+
+Para listar apenas abas normais do navegador com título, URL e WebSocket DevTools:
+
+```bash
+curl --fail --silent --show-error --max-time 10 \
+  http://100.116.151.102:9222/json/list |
+  jq -r '.[] | select(.type == "page") | [.title, .url, .webSocketDebuggerUrl] | @tsv'
+```
+
+O resultado esperado contém ao menos uma linha no formato:
+
+```text
+<título-da-aba>    https://www.google.com/    ws://127.0.0.1:9222/devtools/page/<id-opaco>
+```
+
+No Windows, a mesma confirmação local pode ser feita com:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:9222/json/list |
+    Where-Object { $_.type -eq 'page' } |
+    Select-Object title, url, webSocketDebuggerUrl
+```
+
+Essa leitura confirma que o portproxy alcança uma instância Edge com abas e que ela publicou um WebSocket DevTools. Ela **não** substitui o `browser_prepare` com `existing_profile`: o CUA ainda precisa autorizar, provar o PID/janela exatos e retornar `endpoint_access_class: existing_profile_approved` antes de controlar a página.
+
 Uma conexão resetada pelo IP remoto enquanto o endpoint local não responde normalmente significa que o portproxy recebeu a conexão, mas não encontrou listener em `127.0.0.1:9222`.
 
 Por fim, não solicite `isolated_new` nesse fluxo. No mesmo transporte MCP e com uma sessão estável:
