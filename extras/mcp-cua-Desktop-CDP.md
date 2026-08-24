@@ -885,7 +885,7 @@ Use only the MCP server windows-edge-devtools. List the currently open browser p
 ### 4.2 Tentativa de iniciar o Edge
 
 ```text
-pode tentar com o comando "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222 --user-data-dir="C:\Temp\HermesEdgeCDP"
+Use somente o MCP windows-cua. Não solicite browser_prepare com isolated_new e não envie flags --remote-debugging-* diretamente ao launch_app do Edge. Codifique em UTF-16LE Base64 o Start-Process documentado e use launch_app para iniciar powershell.exe com -NoProfile -WindowStyle Hidden -EncodedCommand. Depois execute list_windows novamente e confirme uma janela real do Edge.
 ```
 
 ### 4.3 Usar o MCP CUA
@@ -897,8 +897,7 @@ tenta usando o mcp do windows-cua
 ### 4.4 Validar com a Calculadora antes do Edge
 
 ```text
-tente novamente com o mcp do windows-cua
-antes abra a caculadora pra validar que esta funcionando e depois execute o & "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222 --user-data-dir="C:\Temp\HermesEdgeCDP"
+Use o MCP windows-cua para abrir C:\Windows\System32\calc.exe e confirme a janela Calculadora com list_windows. Em seguida, inicie PowerShell pelo CUA com o -EncodedCommand do Start-Process do Edge; não use isolated_new nem passe flags DevTools diretamente ao launch_app do Edge. Confirme a janela Edge e o listener local 127.0.0.1:9222 antes de testar o endpoint remoto.
 ```
 
 ### 4.5 Abrir o Google
@@ -989,6 +988,49 @@ Start-Process `
         'https://www.google.com/'
     )
 ```
+
+#### Quando o agente só tem acesso pelo MCP `windows-cua`
+
+Não chame `launch_app` apontando para `msedge.exe` com `--remote-debugging-*` em `additional_arguments`. O CUA recusa essas flags diretamente por projeto. Em vez disso:
+
+1. monte o comando PowerShell exato;
+2. codifique-o como UTF-16LE Base64;
+3. use `launch_app` para iniciar `powershell.exe` com `-EncodedCommand`.
+
+Exemplo de comando a codificar:
+
+```powershell
+Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList @('--remote-debugging-port=9222','--remote-debugging-address=127.0.0.1','--force-renderer-accessibility','--user-data-dir=C:\Temp\HermesEdgeCDP','https://www.google.com/')
+```
+
+No gateway Linux, gere o valor sem executar o Edge localmente:
+
+```python
+import base64
+
+command = r"""Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' -ArgumentList @('--remote-debugging-port=9222','--remote-debugging-address=127.0.0.1','--force-renderer-accessibility','--user-data-dir=C:\Temp\HermesEdgeCDP','https://www.google.com/')"""
+encoded = base64.b64encode(command.encode("utf-16le")).decode()
+print(encoded)
+```
+
+Chame o tool `launch_app` do MCP `windows-cua` com:
+
+```json
+{
+  "path": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+  "additional_arguments": [
+    "-NoProfile",
+    "-WindowStyle",
+    "Hidden",
+    "-EncodedCommand",
+    "<BASE64_UTF16LE_GERADO_ACIMA>"
+  ]
+}
+```
+
+O payload codificado é apenas transporte de argumentos. Ele deve preservar exatamente o executável, o perfil, a porta e a URL solicitados; não é autorização e não substitui `browser_prepare`.
+
+Depois do `launch_app`, execute `list_windows` novamente. Só prossiga quando existir uma janela real do Edge. Em seguida, valide `127.0.0.1:9222` e use `browser_prepare` como `existing_profile`; não volte para `isolated_new`.
 
 Prove o endpoint **local** antes de testar portproxy, firewall ou gateway:
 
