@@ -19,7 +19,7 @@
 - [Parte 2 — Controle remoto do navegador via DevTools](#parte-2--controle-remoto-do-navegador-via-devtools)
   - [Autorizar perfil Chromium existente](#1-autorizar-o-runtime-do-cua-para-usar-um-perfil-existente)
   - [Iniciar Edge e publicar DevTools](#2-iniciar-o-edge-separado-e-publicar-o-devtools-pelo-tailscale)
-  - [Binding do navegador](#3-preparar-e-fazer-binding-do-navegador)
+  - [Preparar e vincular o navegador](#3-preparar-e-vincular-o-navegador)
   - [Prompts de validação e uso](#4-prompts-de-validação-e-uso)
   - [Teste final manual do laboratório](#49-teste-final-manual-end-to-end-do-laboratório)
   - [Diagnóstico e recuperação](#diagnóstico-rápido)
@@ -296,7 +296,7 @@ Restart-Service sshd
 
 O comando `sshd.exe -t` não deve retornar erro.
 
-#### 5.2.2 Validar o clipboard antes de gravar a chave
+#### 5.2.2 Validar a área de transferência antes de gravar a chave
 
 Na VPS, exiba somente a chave pública:
 
@@ -304,7 +304,7 @@ Na VPS, exiba somente a chave pública:
 cat /root/.ssh/id_rsa.pub
 ```
 
-Copie a linha completa para o clipboard do Windows. No PowerShell elevado, valide o conteúdo **antes** de alterar o arquivo:
+Copie a linha completa para a área de transferência do Windows. No PowerShell elevado, valide o conteúdo **antes** de alterar o arquivo:
 
 ```powershell
 $publicKey = (Get-Clipboard -Raw).Trim()
@@ -314,11 +314,11 @@ $publicKey = (Get-Clipboard -Raw).Trim()
 $publicKey
 
 if ($publicKey -notmatch '^(ssh-rsa|ssh-ed25519|ecdsa-sha2-) ') {
-    throw "O clipboard não contém uma chave pública SSH válida. O administrators_authorized_keys não foi alterado."
+    throw "A área de transferência não contém uma chave pública SSH válida. O administrators_authorized_keys não foi alterado."
 }
 ```
 
-Se a saída mostrar um comando como `$publicKey = (Get-Clipboard -Raw).Trim()`, texto comum ou qualquer conteúdo que não comece com um tipo de chave SSH válido, copie novamente a linha de `/root/.ssh/id_rsa.pub` e não prossiga.
+Se a saída mostrar o comando `$publicKey = (Get-Clipboard -Raw).Trim()`, texto comum ou qualquer outro conteúdo que não comece com um tipo de chave SSH válido, copie novamente a linha de `/root/.ssh/id_rsa.pub` e não prossiga.
 
 #### 5.2.3 Gravar a chave e aplicar ACLs no Windows pt-BR
 
@@ -615,7 +615,7 @@ hermes mcp add windows-cua \
   --connect-timeout 30
 ```
 
-Na pergunta de seleção, habilite todos os tools (`Y`).
+Na pergunta de seleção, habilite todas as ferramentas (`Y`).
 
 Valide a integração:
 
@@ -632,7 +632,7 @@ Resultado validado nesta instalação:
 windows-cua  /root/.hermes/bin/windows...  all  ✓ enabled
 ```
 
-O Hermes informa que uma **nova sessão** deve ser iniciada para que os tools MCP apareçam no chat.
+O Hermes informa que uma **nova sessão** deve ser iniciada para que as ferramentas MCP apareçam no chat.
 
 ---
 
@@ -656,9 +656,9 @@ A Parte 2 só deve ser configurada depois que a Parte 1 estiver funcional. Ela n
 
 ## 1. Autorizar o runtime do CUA para usar um perfil existente
 
-O acesso a um perfil Chromium já iniciado pode expor cookies e sessões autenticadas. Por isso, o CUA Driver exige uma autorização definida **quando o runtime é iniciado**.
+O acesso a um perfil Chromium já iniciado pode expor cookies e sessões autenticadas. Por isso, o `cua-driver` exige uma autorização definida **quando o runtime é iniciado**.
 
-Uma autorização escrita no prompt, a aprovação comum de uma chamada MCP ou um argumento enviado pelo agente não substituem esse grant. O modo de permissão fica imutável durante a vida do daemon.
+Uma autorização escrita no prompt, a aprovação comum de uma chamada MCP ou um argumento enviado pelo agente não substituem essa autorização. O modo de permissão fica imutável durante a vida do daemon.
 
 Nesta arquitetura:
 
@@ -667,7 +667,7 @@ cua-driver serve                                  ← possui o runtime e precisa
 cua-driver mcp --socket \\.\pipe\cua-driver      ← apenas se conecta ao daemon
 ```
 
-Portanto, não adicione `--grant existing-profile` ao wrapper `/root/.hermes/bin/windows-cua-mcp`. Adicione-o ao `cua-driver serve` iniciado pelo Scheduled Task do autostart no Windows.
+Portanto, não adicione `--grant existing-profile` ao wrapper `/root/.hermes/bin/windows-cua-mcp`. Adicione-o ao `cua-driver serve` iniciado pela Tarefa Agendada de inicialização automática no Windows.
 
 ### 1.1 Habilitar o opt-in no Hermes Agent
 
@@ -700,9 +700,9 @@ As duas camadas ficam assim:
 | Hermes `computer_use` nativo | `hermes config set computer_use.grant_existing_profile true` |
 | Daemon remoto usado pelo MCP `windows-cua` | `cua-driver serve --permission-mode standard --grant existing-profile` |
 
-Depois de alterar a configuração, inicie uma nova sessão do Hermes para que o runtime seja lançado com o novo grant.
+Depois de alterar a configuração, inicie uma nova sessão do Hermes para que o runtime seja lançado com a nova autorização.
 
-### 1.2 Corrigir o Scheduled Task do autostart
+### 1.2 Corrigir a Tarefa Agendada de inicialização automática
 
 No PowerShell elevado do Windows pt-BR, execute primeiro o autostart normal:
 
@@ -792,7 +792,7 @@ com um diretório de dados separado. Como esse processo foi iniciado fora do cic
 {"strategy":{"kind":"existing_profile"}}
 ```
 
-O nome “perfil separado” neste tutorial significa separado do perfil pessoal do Edge; não significa “perfil isolado pertencente ao Cua Driver”.
+O nome “perfil separado” neste tutorial significa separado do perfil pessoal do Edge; não significa “perfil isolado pertencente ao `cua-driver`”.
 
 ## 2. Iniciar o Edge separado e publicar o DevTools pelo Tailscale
 
@@ -811,7 +811,7 @@ Forma equivalente com o operador `&`:
   --user-data-dir='C:\Temp\HermesEdgeCDP'
 ```
 
-Verifique o listener local:
+Verifique o serviço de escuta local:
 
 ```powershell
 netstat -ano | findstr :9222
@@ -880,7 +880,7 @@ Use então `http://127.0.0.1:9222/json/list` no gateway.
 
 ---
 
-## 3. Preparar e fazer binding do navegador
+## 3. Preparar e vincular o navegador
 
 1. Confirme que o daemon foi reiniciado com `--grant existing-profile`.
 2. Execute `list_windows` para obter o PID e `window_id` atuais do Edge.
@@ -915,7 +915,7 @@ Use somente o MCP windows-cua. Não solicite browser_prepare com isolated_new e 
 ### 4.3 Usar o MCP CUA
 
 ```text
-tenta usando o mcp do windows-cua
+Tente usar o MCP `windows-cua`.
 ```
 
 ### 4.4 Validar com a Calculadora antes do Edge
@@ -927,7 +927,7 @@ Use o MCP windows-cua para abrir C:\Windows\System32\calc.exe e confirme a janel
 ### 4.5 Abrir o Google
 
 ```text
-abra o google.com
+Abra `google.com`.
 ```
 
 ### 4.6 Autorizar o perfil Edge existente
@@ -939,7 +939,7 @@ Eu autorizo o `browser_prepare` a anexar este perfil separado do Edge como `exis
 ### 4.7 Validar o Endpoint DevTools no navegador aberto
 
 ```text
-abra agora entao o google.com para validar o Endpoint DevTools via windows cua , com o navegador que ja esta aberto
+Abra agora `google.com` para validar o endpoint DevTools via `windows-cua`, com o navegador que já está aberto.
 ```
 
 Resultado confirmado: `https://www.google.com/`, binding exato, `mutation_allowed=true` e snapshot pós-navegação válido.
@@ -963,17 +963,17 @@ Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp
 Use o prompt abaixo para uma validação manual completa. Os IPs e usuários deste bloco são valores de um laboratório específico; preserve-os ao testar esse laboratório e não os confunda com os valores Tailscale usados nos exemplos principais do tutorial.
 
 ```text
-Implementar o Cua remoto para compute use (desktop e devtools), em seguida instalar as skills.
+Implemente o CUA remoto para `computer_use` (desktop e DevTools) e, em seguida, instale as skills.
 Windows: <IP> (usuário: daniel)
 Linux (VPS): <IP> (usuário: root)
 
 Autenticação SSH por chave já configurada nos dois sentidos.
 Implementar tudo de acordo com a documentação github.com/danieldemoraisgurgel/masterclass-hermes-agent/blob/main/extras/mcp-cua-Desktop-CDP.md
 
-Executar a Calculadora via Cua Windows e calcular 2+2.
-Executar o CDP DevTools via Cua Windows, conecte-se ao navegador e acesse google.com, informar dados de estatisticas do navegador no carregamento do site, como tamanho, latência, validade do ssl.
+Execute a Calculadora via CUA no Windows e calcule 2+2.
+Execute o CDP DevTools via CUA no Windows, conecte-se ao navegador, acesse `google.com` e informe dados estatísticos do carregamento do site, como tamanho, latência e validade do SSL.
 
-Ao final, exiba os dados e confirme que a calculadora foi aberta utilizando o CUA e os dados do navegador, via Endpoint CDP.
+Ao final, exiba os dados e confirme que a Calculadora foi aberta por meio do CUA e que os dados do navegador foram obtidos via endpoint CDP.
 ```
 
 **Critérios de aceitação do teste:**
@@ -990,7 +990,7 @@ Ao final, exiba os dados e confirme que a calculadora foi aberta utilizando o CU
 ## Diagnóstico rápido
 
 - `browser_binding_stale`: redescubra PID e `window_id` com `list_windows`.
-- `browser_consent_required`: confirme `hermes config get computer_use.grant_existing_profile`, reinicie a sessão Hermes e, para o MCP remoto, reinicie o daemon com `serve --permission-mode standard --grant existing-profile`; depois repita `browser_prepare`.
+- `browser_consent_required`: confirme `hermes config get computer_use.grant_existing_profile`, reinicie a sessão do Hermes e, para o MCP remoto, reinicie o daemon com `serve --permission-mode standard --grant existing-profile`; depois repita `browser_prepare`.
 - `browser_route_unavailable`: confirme Edge/Chrome suportado, PID e `window_id` atuais e use `existing_profile` autorizado.
 - `background_unavailable`: tente background uma vez; depois use `foreground` apenas se o CUA recomendar.
 
@@ -1085,7 +1085,7 @@ Chame o tool `launch_app` do MCP `windows-cua` com:
 }
 ```
 
-O payload codificado é apenas transporte de argumentos. Ele deve preservar exatamente o executável, o perfil, a porta e a URL solicitados; não é autorização e não substitui `browser_prepare`.
+O conteúdo codificado serve apenas para transportar argumentos. Ele deve preservar exatamente o executável, o perfil, a porta e a URL solicitados; não é autorização e não substitui `browser_prepare`.
 
 Depois do `launch_app`, execute `list_windows` novamente. Só prossiga quando existir uma janela real do Edge. Em seguida, valide `127.0.0.1:9222` e use `browser_prepare` como `existing_profile`; não volte para `isolated_new`.
 
@@ -1153,9 +1153,9 @@ Invoke-RestMethod http://127.0.0.1:9222/json/list |
     Select-Object title, url, webSocketDebuggerUrl
 ```
 
-Essa leitura confirma que o portproxy alcança uma instância Edge com abas e que ela publicou um WebSocket DevTools. Ela **não** substitui o `browser_prepare` com `existing_profile`: o CUA ainda precisa autorizar, provar o PID/janela exatos e retornar `endpoint_access_class: existing_profile_approved` antes de controlar a página.
+Essa leitura confirma que o portproxy alcança uma instância do Edge com abas e que ela publicou um WebSocket DevTools. Ela **não** substitui o `browser_prepare` com `existing_profile`: o CUA ainda precisa autorizar, provar o PID/janela exatos e retornar `endpoint_access_class: existing_profile_approved` antes de controlar a página.
 
-Uma conexão resetada pelo IP remoto enquanto o endpoint local não responde normalmente significa que o portproxy recebeu a conexão, mas não encontrou listener em `127.0.0.1:9222`.
+Uma conexão resetada pelo IP remoto enquanto o endpoint local não responde normalmente significa que o portproxy recebeu a conexão, mas não encontrou um serviço de escuta em `127.0.0.1:9222`.
 
 Por fim, não solicite `isolated_new` nesse fluxo. No mesmo transporte MCP e com uma sessão estável:
 
@@ -1164,7 +1164,7 @@ Por fim, não solicite `isolated_new` nesse fluxo. No mesmo transporte MCP e com
 3. chame imediatamente `get_browser_state`;
 4. exija `endpoint_access_class: existing_profile_approved`, `binding_quality: exact` e `mutation_allowed: true`.
 
-No Windows/Edge pt-BR, o adaptador de setup de perfil existente pode recusar controles internos localizados que não reconheça. Iniciar previamente o Edge com `--remote-debugging-port=9222` evita depender dessa etapa visual, mas não elimina a exigência do grant de runtime.
+No Windows/Edge pt-BR, o adaptador de configuração de perfil existente pode recusar controles internos localizados que não reconheça. Iniciar previamente o Edge com `--remote-debugging-port=9222` evita depender dessa etapa visual, mas não elimina a exigência do grant de runtime.
 
 ```powershell
 query session
@@ -1189,7 +1189,7 @@ Foi confirmado:
 MCP windows-cua: enabled
 Transporte: stdio → /root/.hermes/bin/windows-cua-mcp
 Teste do MCP: conectado
-Tools descobertas: 57
+Ferramentas descobertas: 57
 Permissão do wrapper: 700
 IP Tailscale do gateway: 100.79.185.92
 SSH para Windows: OK
@@ -1230,7 +1230,7 @@ http://100.116.151.102:9222/json/list
 
 A mesma checagem local no Windows para `http://127.0.0.1:9222/json/version` não conectou. Os processos Edge em execução usavam o perfil padrão e nenhum apresentava `--remote-debugging-port=9222`.
 
-**Interpretação:** o portproxy, o firewall e o listener Tailscale estavam corretos, mas não havia uma instância Edge DevTools atendendo em `127.0.0.1:9222` naquele instante. Inicie ou reinicie a instância isolada antes de testar o endpoint:
+**Interpretação:** o portproxy, o firewall e o listener Tailscale estavam corretos, mas não havia uma instância do Edge com DevTools atendendo em `127.0.0.1:9222` naquele instante. Inicie ou reinicie a instância isolada antes de testar o endpoint:
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' `
@@ -1518,7 +1518,7 @@ curl --fail --silent --show-error --max-time 10 \
 
 A resposta precisa ter ao menos uma entrada `type: page` com título, URL e `webSocketDebuggerUrl`. Isso prova somente a conectividade Edge/CDP; não substitui a autorização do CUA.
 
-## 4. Fazer o binding pelo CUA
+## 4. Vincular pelo CUA
 
 No **mesmo transporte MCP**:
 
@@ -1558,7 +1558,7 @@ list_windows → browser_prepare → get_browser_state → browser_navigate → 
 - [ ] `list_windows` retorna janelas reais.
 - [ ] Calculadora abre e `2 + 2` retorna `4`.
 - [ ] Edge escuta na porta 9222.
-- [ ] Portproxy aponta o IP Tailscale para `127.0.0.1:9222`.
+- [ ] O portproxy direciona o IP Tailscale para `127.0.0.1:9222`.
 - [ ] Firewall permite apenas `100.79.185.92`.
 - [ ] `hermes config get computer_use.grant_existing_profile` retorna `true` no perfil que usa o `computer_use` nativo.
 - [ ] Scheduled Task inicia `cua-driver serve --permission-mode standard --grant existing-profile`.
@@ -1571,8 +1571,8 @@ list_windows → browser_prepare → get_browser_state → browser_navigate → 
 ## Referências
 
 - CUA Windows via SSH: <https://cua.ai/docs/how-to-guides/driver/windows-ssh>
-- Cua Driver — modos de permissão: <https://cua.ai/docs/reference/cua-driver/permission-modes>
-- Cua Driver — anexar perfil Chromium existente: <https://cua.ai/docs/reference/cua-driver/browser-profile-attachment>
+- CUA Driver — modos de permissão: <https://cua.ai/docs/reference/cua-driver/permission-modes>
+- CUA Driver — anexar perfil Chromium existente: <https://cua.ai/docs/reference/cua-driver/browser-profile-attachment>
 - Microsoft — autenticação por chave no OpenSSH for Windows: <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement>
 - Microsoft — configuração do OpenSSH Server no Windows: <https://learn.microsoft.com/en-us/windows-server/administration/OpenSSH/openssh-server-configuration>
 - Hermes Desktop — conexões com múltiplas instâncias: <https://hermes-agent.nousresearch.com/docs/user-guide/multi-connection-desktop>
