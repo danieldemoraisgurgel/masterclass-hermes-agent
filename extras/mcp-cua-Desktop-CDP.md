@@ -147,10 +147,27 @@ chmod 644 ~/.ssh/id_rsa.pub
 ssh-keygen -lf ~/.ssh/id_rsa.pub
 ```
 
-Para copiar a chave pública, exiba **somente** este arquivo no gateway e cole seu conteúdo no Windows durante a próxima seção:
+### 5.1.1 Copiar a chave pública para o Windows
+
+A cópia é manual e deve levar **uma única linha** do Linux para o Windows. Não use `scp` neste momento: a autenticação por chave ainda não foi configurada.
+
+1. No terminal do **gateway Linux/VPS**, mostre a chave pública:
+
+   ```bash
+   cat ~/.ssh/id_rsa.pub
+   ```
+
+2. Selecione a linha inteira exibida e copie-a. Ela normalmente começa com `ssh-rsa` e termina com o comentário `hermes-gateway@...`.
+3. No Windows, abra o arquivo `authorized_keys` correspondente ao tipo da conta, conforme a seção seguinte, e cole a linha **sem quebrá-la em várias linhas**.
+4. Salve o arquivo como texto simples. Não inclua aspas, espaços antes de `ssh-rsa`, `id_rsa` (a chave privada) nem qualquer outra saída do terminal.
+
+> **Atenção:** copie somente o resultado de `cat ~/.ssh/id_rsa.pub`. Nunca copie o conteúdo de `~/.ssh/id_rsa`, nem envie a chave privada por chat, e-mail ou arquivo compartilhado.
+
+Para conferir no Linux se o arquivo contém uma chave pública válida antes de copiá-lo:
 
 ```bash
-cat ~/.ssh/id_rsa.pub
+ssh-keygen -lf ~/.ssh/id_rsa.pub
+awk '{print "tipo=" $1, "campos=" NF, "comentario=" $3}' ~/.ssh/id_rsa.pub
 ```
 
 Nesta instalação, a chave do gateway já existe em `/root/.ssh/id_rsa`, está com permissão `600` e sua chave pública está em `/root/.ssh/id_rsa.pub`.
