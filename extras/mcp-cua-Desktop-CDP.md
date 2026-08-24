@@ -208,49 +208,112 @@ Nesta instalação, a chave do gateway já existe em `/root/.ssh/id_rsa`, está 
 
 ### 5.2 Autorizar a chave pública no Windows
 
-No Windows, abra o **PowerShell da conta que receberá o acesso SSH**. Para editar o arquivo global de administradores, abra-o como Administrador.
+A chave deve ser instalada no perfil **da mesma conta Windows usada no login SSH**. Neste exemplo, o usuário é `danie`, portanto o arquivo recomendado é:
+
+```text
+C:\Users\danie\.ssh\authorized_keys
+```
+
+No PowerShell, `$HOME` e `$env:USERPROFILE` apontam para o perfil da conta atualmente conectada. Confirme antes de criar o arquivo:
+
+```powershell
+whoami
+$env:USERPROFILE
+```
+
+O resultado esperado neste exemplo é `C:\Users\danie`. A chave pública da VPS deve ser colada em `authorized_keys` como **uma única linha completa**. Não cole a chave privada (`id_rsa`) e não use o arquivo `.ssh` de outra conta.
 
 ### Conta Windows comum
 
-Para uma conta que **não** é administradora, use:
+Para a conta Windows que **não** pertence ao grupo Administradores, abra o PowerShell como o próprio usuário que receberá o acesso e execute:
 
 ```powershell
-New-Item -ItemType Directory -Force "$HOME\.ssh" | Out-Null
-notepad "$HOME\.ssh\authorized_keys"
-# Cole uma única linha completa do arquivo id_rsa.pub do gateway, salve e feche.
-```
+$sshDir = Join-Path $env:USERPROFILE '.ssh'
+$keyPath = Join-Path $sshDir 'authorized_keys'
+New-Item -ItemType Directory -Force $sshDir | Out-Null
+notepad $keyPath
+# Cole aqui uma única linha completa de /root/.ssh/id_rsa.pub da VPS.
+# Salve como texto simples e feche o Notepad.
 
-Em seguida, aplique ACLs restritas:
-
-```powershell
 $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-icacls "$HOME\.ssh" /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
-icacls "$HOME\.ssh\authorized_keys" /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
+icacls $sshDir /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
+icacls $keyPath /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
+Write-Host "Chave autorizada em: $keyPath"
 ```
 
-### Conta Windows administradora
+O arquivo final ficará em `C:\Users\<usuário>\.ssh\authorized_keys`, por exemplo `C:\Users\danie\.ssh\authorized_keys`.
 
-O usuário usado nesta instalação (`danie`) pertence ao grupo local de administradores. Por causa deste bloco padrão do `sshd_config`:
+### Conta Windows administradora — caminho recomendado no perfil do usuário
+
+Por padrão, o OpenSSH para Windows pode usar um arquivo global para administradores:
+
+```text
+C:\ProgramData\ssh\administrators_authorized_keys
+```
+
+Esse comportamento vem deste bloco do `C:\ProgramData\ssh\sshd_config`:
 
 ```text
 Match Group administrators
     AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys
 ```
 
-O OpenSSH ignora `C:\Users\danie\.ssh\authorized_keys` e exige o arquivo global. Em PowerShell elevado:
+Para manter a chave dentro do perfil do usuário, que é a opção recomendada neste tutorial, altere o `sshd_config` para usar `.ssh/authorized_keys` relativo ao perfil da conta:
+
+1. Abra o **PowerShell como Administrador**.
+2. Faça uma cópia de segurança e abra a configuração:
+
+   ```powershell
+   $sshdConfig = Join-Path $env:ProgramData 'ssh\sshd_config'
+   Copy-Item $sshdConfig "$sshdConfig.bak" -Force
+   notepad $sshdConfig
+   ```
+
+3. Antes do primeiro bloco `Match`, adicione:
+
+   ```text
+   AuthorizedKeysFile .ssh/authorized_keys
+   ```
+
+4. Comente ou remova o bloco padrão específico de administradores, para que ele não substitua o caminho do perfil:
+
+   ```text
+   #Match Group administrators
+   #    AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys
+   ```
+
+5. Salve o arquivo, valide a configuração e reinicie o serviço:
+
+   ```powershell
+   & "$env:WINDIR\System32\OpenSSH\sshd.exe" -t
+   Restart-Service sshd
+   ```
+
+Agora, ainda no PowerShell elevado, crie o arquivo no perfil da **conta que será usada no SSH**. Se o login for `danie`, `$env:USERPROFILE` deve ser `C:\Users\danie`:
 
 ```powershell
-$keyPath = Join-Path $env:ProgramData 'ssh\administrators_authorized_keys'
+whoami
+$env:USERPROFILE
+
+$sshDir = Join-Path $env:USERPROFILE '.ssh'
+$keyPath = Join-Path $sshDir 'authorized_keys'
+New-Item -ItemType Directory -Force $sshDir | Out-Null
 notepad $keyPath
-# Cole uma única linha completa do arquivo id_rsa.pub do gateway, salve e feche.
-icacls $keyPath /inheritance:r /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F'
-Restart-Service sshd
+# Cole aqui uma única linha completa de /root/.ssh/id_rsa.pub da VPS.
+# Salve como texto simples e feche o Notepad.
+
+$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+icacls $sshDir /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
+icacls $keyPath /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
+Write-Host "Chave autorizada em: $keyPath"
 ```
 
-Os SIDs usados acima são:
+> Se preferir **não alterar** o `sshd_config`, a conta administradora deverá usar o caminho global `C:\ProgramData\ssh\administrators_authorized_keys`, com ACLs para o grupo local Administradores e `SYSTEM`. Nesse caso, não cole a chave em `C:\Users\danie\.ssh\authorized_keys`, pois o OpenSSH continuará ignorando esse arquivo.
+
+Os SIDs usados pela alternativa global são:
 
 - `S-1-5-32-544`: grupo local Administradores;
-- `S-1-5-18`: SYSTEM.
+- `S-1-5-18`: `SYSTEM`.
 
 ### 5.3 Validar a autenticação SSH a partir da VPS
 
