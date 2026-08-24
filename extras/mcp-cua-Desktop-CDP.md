@@ -4,6 +4,27 @@
 >
 > **Objetivo:** primeiro habilitar o controle remoto do desktop Windows. Em seguida, quando necessário, expor com segurança o DevTools do Edge para que o mesmo gateway controle o navegador remotamente.
 
+## Índice
+
+- [Visão geral](#visão-geral)
+- [Parte 1 — Controle remoto da área de trabalho Windows](#parte-1--controle-remoto-da-área-de-trabalho-windows)
+  - [Arquitetura e fluxo](#1-arquitetura-e-fluxo)
+  - [Pré-requisitos](#2-pré-requisitos-da-parte-1)
+  - [Preparar o `cua-driver`](#3-preparar-o-cua-driver-no-windows)
+  - [Habilitar SSH no Windows](#4-habilitar-o-ssh-no-windows)
+  - [SSH do gateway para o Windows](#5-configurar-o-ssh-do-gateway-para-o-windows-vps--windows)
+  - [SSH do Hermes Desktop para o gateway](#6-configurar-o-ssh-do-hermes-desktop-para-o-gateway-windows--vps)
+  - [Wrapper e MCP `windows-cua`](#7-criar-o-wrapper-mcp-no-gateway)
+  - [Validação do controle do desktop](#9-validar-o-controle-remoto-do-desktop)
+- [Parte 2 — Controle remoto do navegador via DevTools](#parte-2--controle-remoto-do-navegador-via-devtools)
+  - [Autorizar perfil Chromium existente](#1-autorizar-o-runtime-do-cua-para-usar-um-perfil-existente)
+  - [Iniciar Edge e publicar DevTools](#2-iniciar-o-edge-separado-e-publicar-o-devtools-pelo-tailscale)
+  - [Binding do navegador](#3-preparar-e-fazer-binding-do-navegador)
+  - [Prompts de validação e uso](#4-prompts-de-validação-e-uso)
+  - [Diagnóstico e recuperação](#diagnóstico-rápido)
+- [Checklist operacional](#checklist-operacional)
+- [Referências](#referências)
+
 ## Visão geral
 
 Este tutorial tem duas partes independentes, mas a segunda depende da primeira:
@@ -1012,6 +1033,14 @@ command = r"""Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\App
 encoded = base64.b64encode(command.encode("utf-16le")).decode()
 print(encoded)
 ```
+
+Para o comando deste exemplo, o valor UTF-16LE Base64 já gerado é o texto simples abaixo. Ele corresponde exatamente ao perfil `C:\Temp\HermesEdgeCDP` e à URL `https://www.google.com/`:
+
+```text
+UwB0AGEAcgB0AC0AUAByAG8AYwBlAHMAcwAgAC0ARgBpAGwAZQBQAGEAdABoACAAJwBDADoAXABQAHIAbwBnAHIAYQBtACAARgBpAGwAZQBzACAAKAB4ADgANgApAFwATQBpAGMAcgBvAHMAbwBmAHQAXABFAGQAZwBlAFwAQQBwAHAAbABpAGMAYQB0AGkAbwBuAFwAbQBzAGUAZABnAGUALgBlAHgAZQAnACAALQBBAHIAZwB1AG0AZQBuAHQATABpAHMAdAAgAEAAKAAnAC0ALQByAGUAbQBvAHQAZQAtAGQAZQBiAHUAZwBnAGkAbgBnAC0AcABvAHIAdAA9ADkAMgAyADIAJwAsACcALQAtAHIAZQBtAG8AdABlAC0AZABlAGIAdQBnAGcAaQBuAGcALQBhAGQAZAByAGUAcwBzAD0AMQAyADcALgAwAC4AMAAuADEAJwAsACcALQAtAGYAbwByAGMAZQAtAHIAZQBuAGQAZQByAGUAcgAtAGEAYwBjAGUAcwBzAGkAYgBpAGwAaQB0AHkAJwAsACcALQAtAHUAcwBlAHIALQBkAGEAdABhAC0AZABpAHIAPQBDADoAXABUAGUAbQBwAFwASABlAHIAbQBlAHMARQBkAGcAZQBDAEQAUAAnACwAJwBoAHQAdABwAHMAOgAvAC8AdwB3AHcALgBnAG8AbwBnAGwAZQAuAGMAbwBtAC8AJwApAA==
+```
+
+Se mudar o caminho do perfil, a porta ou a URL, gere um novo valor pelo script Python anterior; não reutilize este texto codificado com parâmetros diferentes.
 
 Chame o tool `launch_app` do MCP `windows-cua` com:
 
