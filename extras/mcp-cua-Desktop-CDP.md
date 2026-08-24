@@ -42,7 +42,7 @@ O gateway não usa o `computer_use` nativo para controlar o Windows, pois esse t
 
 - VPS Linux com Hermes Agent configurado.
 - Máquina Windows conectada à mesma tailnet.
-- Usuário Windows com uma sessão gráfica aberta (console ou RDP).
+- Usuário Windows `danie`, membro do grupo local **Administradores**, com uma sessão gráfica aberta (console ou RDP).
 - `cua-driver` instalado no Windows.
 - OpenSSH Server habilitado no Windows.
 - Chave pública do VPS autorizada para o usuário Windows.
@@ -140,13 +140,15 @@ timeout 5 bash -c '</dev/tcp/100.116.151.102/22'
 
 ---
 
-## 5. Configurar a autenticação SSH por chave
+## 5. Configurar o SSH do gateway para o Windows (VPS → Windows)
 
-Nesta etapa, a VPS e o Desktop Windows passam a se autenticar por chave pública:
+Esta seção configura o primeiro sentido da comunicação: o gateway Linux atua como cliente SSH e o Windows atua como servidor SSH. A autenticação inversa, usada pelo Hermes Desktop para acessar o gateway, será configurada separadamente na seção 6.
+
+No sentido VPS → Windows:
 
 1. a VPS cria ou usa o par `/root/.ssh/id_rsa` e mantém a chave privada somente nela;
 2. o conteúdo de `/root/.ssh/id_rsa.pub` é copiado para o Windows;
-3. o Windows instala essa chave no `authorized_keys` correto para a conta usada;
+3. o Windows instala essa chave em `C:\ProgramData\ssh\administrators_authorized_keys`, caminho padrão para a conta administrativa `danie`;
 4. a VPS testa o login com `IdentitiesOnly=yes` e `BatchMode=yes`, sem senha;
 5. somente depois disso o wrapper MCP deve ser criado.
 
@@ -192,7 +194,7 @@ A cópia é manual e deve levar **uma única linha** do Linux para o Windows. N�
    ```
 
 2. Selecione a linha inteira exibida e copie-a. Ela normalmente começa com `ssh-rsa` e termina com o comentário `hermes-gateway@...`.
-3. No Windows, abra o arquivo `authorized_keys` correspondente ao tipo da conta, conforme a seção seguinte, e cole a linha **sem quebrá-la em várias linhas**.
+3. No Windows pt-BR, instale a linha em `C:\ProgramData\ssh\administrators_authorized_keys`, sem quebrá-la em várias linhas.
 4. Salve o arquivo como texto simples. Não inclua aspas, espaços antes de `ssh-rsa`, `id_rsa` (a chave privada) nem qualquer outra saída do terminal.
 
 > **Atenção:** copie somente o resultado de `cat ~/.ssh/id_rsa.pub`. Nunca copie o conteúdo de `~/.ssh/id_rsa`, nem envie a chave privada por chat, e-mail ou arquivo compartilhado.
@@ -206,167 +208,180 @@ awk '{print "tipo=" $1, "campos=" NF, "comentario=" $3}' ~/.ssh/id_rsa.pub
 
 Nesta instalação, a chave do gateway já existe em `/root/.ssh/id_rsa`, está com permissão `600` e sua chave pública está em `/root/.ssh/id_rsa.pub`.
 
-### 5.2 Autorizar a chave pública no Windows
+### 5.2 Autorizar a chave pública no Windows pt-BR
 
-A chave deve ser instalada no perfil **da mesma conta Windows usada no login SSH**. Neste exemplo, o usuário é `danie`, portanto o arquivo recomendado é:
+Este tutorial trabalha com um único cenário:
 
-```text
-C:\Users\danie\.ssh\authorized_keys
-```
+- Windows em **pt-BR**;
+- usuário SSH: `danie`;
+- conta `danie` membro do grupo local **Administradores**;
+- `sshd_config` mantido no comportamento padrão do OpenSSH for Windows.
 
-No PowerShell, `$HOME` e `$env:USERPROFILE` apontam para o perfil da conta atualmente conectada. Confirme antes de criar o arquivo:
-
-```powershell
-whoami
-$env:USERPROFILE
-```
-
-O resultado esperado neste exemplo é `C:\Users\danie`. A chave pública da VPS deve ser colada em `authorized_keys` como **uma única linha completa**. Não cole a chave privada (`id_rsa`) e não use o arquivo `.ssh` de outra conta.
-
-### Conta Windows comum
-
-Para a conta Windows que **não** pertence ao grupo Administradores, abra o PowerShell como o próprio usuário que receberá o acesso e execute:
-
-```powershell
-$sshDir = Join-Path $env:USERPROFILE '.ssh'
-$keyPath = Join-Path $sshDir 'authorized_keys'
-New-Item -ItemType Directory -Force $sshDir | Out-Null
-notepad $keyPath
-# Cole aqui uma única linha completa de /root/.ssh/id_rsa.pub da VPS.
-# Salve como texto simples e feche o Notepad.
-
-$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-icacls $sshDir /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
-icacls $keyPath /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
-Write-Host "Chave autorizada em: $keyPath"
-```
-
-O arquivo final ficará em `C:\Users\<usuário>\.ssh\authorized_keys`, por exemplo `C:\Users\danie\.ssh\authorized_keys`.
-
-### Conta Windows administradora — caminho recomendado no perfil do usuário
-
-Por padrão, o OpenSSH para Windows pode usar um arquivo global para administradores:
+Portanto, a chave pública da VPS deve ser instalada exclusivamente em:
 
 ```text
 C:\ProgramData\ssh\administrators_authorized_keys
 ```
 
-Esse comportamento vem deste bloco do `C:\ProgramData\ssh\sshd_config`:
+Não use, neste cenário:
+
+```text
+C:\Users\danie\.ssh\authorized_keys
+C:\Users\danie\.ssh\authorized_keys.txt
+C:\ProgramData\ssh\administrators_authorized_keys.txt
+```
+
+Os arquivos terminados em `.txt` são ignorados pelo OpenSSH. O arquivo dentro de `C:\Users\danie\.ssh` também é ignorado para a conta administrativa enquanto o bloco padrão `Match Group administrators` estiver ativo.
+
+#### 5.2.1 Confirmar a conta administrativa e o `sshd_config`
+
+Abra o PowerShell como Administrador e execute:
+
+```powershell
+whoami
+whoami /groups | findstr "S-1-5-32-544"
+
+Get-Content C:\ProgramData\ssh\sshd_config |
+    Select-String "AuthorizedKeysFile|Match Group"
+```
+
+No Windows pt-BR, a saída do grupo pode aparecer como:
+
+```text
+BUILTIN\Administradores    S-1-5-32-544
+```
+
+O SID `S-1-5-32-544` identifica o grupo local Administradores independentemente do idioma. O `sshd_config` deve manter este bloco ativo, sem `#`:
 
 ```text
 Match Group administrators
     AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys
 ```
 
-Para manter a chave dentro do perfil do usuário, que é a opção recomendada neste tutorial, altere o `sshd_config` para usar `.ssh/authorized_keys` relativo ao perfil da conta:
-
-1. Abra o **PowerShell como Administrador**.
-2. Faça uma cópia de segurança e abra a configuração:
-
-   ```powershell
-   $sshdConfig = Join-Path $env:ProgramData 'ssh\sshd_config'
-   Copy-Item $sshdConfig "$sshdConfig.bak" -Force
-   notepad $sshdConfig
-   ```
-
-3. Antes do primeiro bloco `Match`, adicione:
-
-   ```text
-   AuthorizedKeysFile .ssh/authorized_keys
-   ```
-
-4. Comente ou remova o bloco padrão específico de administradores, para que ele não substitua o caminho do perfil:
-
-   ```text
-   #Match Group administrators
-   #    AuthorizedKeysFile __PROGRAMDATA__/ssh/administrators_authorized_keys
-   ```
-
-5. Salve o arquivo, valide a configuração e reinicie o serviço:
-
-   ```powershell
-   & "$env:WINDIR\System32\OpenSSH\sshd.exe" -t
-   Restart-Service sshd
-   ```
-
-Agora, ainda no PowerShell elevado, crie o arquivo no perfil da **conta que será usada no SSH**. Se o login for `danie`, `$env:USERPROFILE` deve ser `C:\Users\danie`:
+Se você seguiu uma versão anterior deste tutorial e comentou ou removeu esse bloco, restaure o comportamento padrão:
 
 ```powershell
-whoami
-$env:USERPROFILE
+$sshdConfig = Join-Path $env:ProgramData 'ssh\sshd_config'
+Copy-Item $sshdConfig "$sshdConfig.bak" -Force
+notepad $sshdConfig
+# Garanta que o bloco Match Group administrators esteja ativo e sem #.
 
-$sshDir = Join-Path $env:USERPROFILE '.ssh'
-$keyPath = Join-Path $sshDir 'authorized_keys'
-New-Item -ItemType Directory -Force $sshDir | Out-Null
-notepad $keyPath
-# Cole aqui uma única linha completa de /root/.ssh/id_rsa.pub da VPS.
-# Salve como texto simples e feche o Notepad.
-
-$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-icacls $sshDir /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
-icacls $keyPath /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
-Write-Host "Chave autorizada em: $keyPath"
+& "$env:WINDIR\System32\OpenSSH\sshd.exe" -t
+Restart-Service sshd
 ```
 
-> Se preferir **não alterar** o `sshd_config`, a conta administradora deverá usar o caminho global `C:\ProgramData\ssh\administrators_authorized_keys`, com ACLs para o grupo local Administradores e `SYSTEM`. Nesse caso, não cole a chave em `C:\Users\danie\.ssh\authorized_keys`, pois o OpenSSH continuará ignorando esse arquivo.
+O comando `sshd.exe -t` não deve retornar erro.
 
-Os SIDs usados pela alternativa global são:
+#### 5.2.2 Validar o clipboard antes de gravar a chave
 
-- `S-1-5-32-544`: grupo local Administradores;
-- `S-1-5-18`: `SYSTEM`.
-
-### 5.2.1 Corrigir o arquivo criado como `authorized_keys.txt`
-
-Se `notepad $keyPath` abriu ou salvou como `authorized_keys.txt`, isso normalmente aconteceu porque o arquivo sem extensão ainda não existia. O OpenSSH **não lê `authorized_keys.txt`**: ele procura exatamente:
-
-```text
-C:\Users\danie\.ssh\authorized_keys
-```
-
-Use o procedimento abaixo no PowerShell do usuário Windows que receberá o SSH. Primeiro, copie para a área de transferência do Windows a única linha exibida na VPS por:
+Na VPS, exiba somente a chave pública:
 
 ```bash
 cat /root/.ssh/id_rsa.pub
 ```
 
-Depois, no Windows, execute:
+Copie a linha completa para o clipboard do Windows. No PowerShell elevado, valide o conteúdo **antes** de alterar o arquivo:
 
 ```powershell
-$sshDir = Join-Path $env:USERPROFILE '.ssh'
-$keyPath = Join-Path $sshDir 'authorized_keys'
-$txtPath = Join-Path $sshDir 'authorized_keys.txt'
-New-Item -ItemType Directory -Force $sshDir | Out-Null
-
-# Grava a chave exatamente no arquivo usado pelo OpenSSH, sem extensão.
 $publicKey = (Get-Clipboard -Raw).Trim()
-Set-Content -Path $keyPath -Value $publicKey -NoNewline -Encoding ascii
 
-# Mantém também uma cópia .txt apenas para conferência/backup.
-Copy-Item -Path $keyPath -Destination $txtPath -Force
+# Confira visualmente. Deve começar com ssh-rsa AAAA...,
+# ssh-ed25519 AAAA... ou ecdsa-sha2-...
+$publicKey
 
-$user = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-icacls $sshDir /inheritance:r /grant:r "$($user):(OI)(CI)F" "SYSTEM:(OI)(CI)F"
-icacls $keyPath /inheritance:r /grant:r "$($user):F" "SYSTEM:F"
-
-Write-Host "Arquivo usado pelo OpenSSH: $keyPath"
-Write-Host "Copia de conferencia:       $txtPath"
+if ($publicKey -notmatch '^(ssh-rsa|ssh-ed25519|ecdsa-sha2-) ') {
+    throw "O clipboard não contém uma chave pública SSH válida. O administrators_authorized_keys não foi alterado."
+}
 ```
 
-Confirme que os dois arquivos têm a mesma chave e que o arquivo principal realmente não possui extensão:
+Se a saída mostrar um comando como `$publicKey = (Get-Clipboard -Raw).Trim()`, texto comum ou qualquer conteúdo que não comece com um tipo de chave SSH válido, copie novamente a linha de `/root/.ssh/id_rsa.pub` e não prossiga.
+
+#### 5.2.3 Gravar a chave e aplicar ACLs no Windows pt-BR
+
+Depois que a validação anterior passar:
 
 ```powershell
-Get-Item $keyPath, $txtPath | Select-Object FullName, Length
-Get-Content -Path $keyPath
-Get-Content -Path $txtPath
+$keyPath = Join-Path $env:ProgramData 'ssh\administrators_authorized_keys'
+
+Set-Content `
+    -Path $keyPath `
+    -Value $publicKey `
+    -NoNewline `
+    -Encoding ascii
+
+# Use SIDs para o comando funcionar independentemente dos nomes localizados.
+icacls $keyPath `
+    /inheritance:r `
+    /grant:r '*S-1-5-32-544:F' '*S-1-5-18:F'
+
+Get-Content $keyPath
+ssh-keygen -lf $keyPath
+icacls $keyPath
+Restart-Service sshd
 ```
 
-O arquivo relevante para o login é `C:\Users\danie\.ssh\authorized_keys`. O arquivo `authorized_keys.txt` pode existir, mas é ignorado pelo OpenSSH e não corrige o erro `Permission denied (publickey)`.
+No Windows pt-BR, o `icacls` pode mostrar os principais como:
 
-> Se `Get-Clipboard -Raw` não estiver disponível, cole manualmente a linha da chave no Notepad aberto pelo caminho exato `$keyPath`. No diálogo **Salvar como**, selecione `Todos os arquivos (*.*)` e confirme que o nome é `authorized_keys`, não `authorized_keys.txt`.
+```text
+BUILTIN\Administradores:(F)
+AUTORIDADE NT\SISTEMA:(F)
+```
 
-### 5.3 Validar a autenticação SSH a partir da VPS
+Os SIDs usados são:
 
-Na primeira conexão, confirme a impressão digital do host Windows e aceite-a somente se ela tiver sido verificada por um canal confiável. Isso grava o host em `~/.ssh/known_hosts` e permite que o wrapper use `StrictHostKeyChecking=yes`:
+- `S-1-5-32-544`: grupo local Administradores;
+- `S-1-5-18`: conta `SYSTEM` (`AUTORIDADE NT\SISTEMA` no Windows pt-BR).
+
+#### 5.2.4 Corrigir arquivos criados com extensão `.txt`
+
+Se o Notepad criou `authorized_keys.txt` ou `administrators_authorized_keys.txt`, não use esses arquivos para autenticação. O único arquivo utilizado neste cenário é:
+
+```text
+C:\ProgramData\ssh\administrators_authorized_keys
+```
+
+Para conferir o nome e a extensão:
+
+```powershell
+Get-ChildItem C:\ProgramData\ssh\administrators_authorized_keys* |
+    Select-Object FullName, Length
+```
+
+Valide o arquivo correto:
+
+```powershell
+Get-Content C:\ProgramData\ssh\administrators_authorized_keys
+ssh-keygen -lf C:\ProgramData\ssh\administrators_authorized_keys
+```
+
+A primeira saída deve começar com `ssh-rsa`, `ssh-ed25519` ou `ecdsa-sha2-`. A segunda deve retornar um fingerprint `SHA256:...` sem erro.
+
+### 5.3 Validar fingerprint e autenticação VPS → Windows
+
+Não avance para o MCP sem comprovar que a chave pública instalada no Windows corresponde à chave privada usada pela VPS.
+
+No Windows pt-BR, valide o arquivo global usado pela conta administrativa `danie`:
+
+```powershell
+whoami
+whoami /groups | findstr "S-1-5-32-544"
+
+Get-Content C:\ProgramData\ssh\sshd_config |
+    Select-String "AuthorizedKeysFile|Match Group"
+
+ssh-keygen -lf C:\ProgramData\ssh\administrators_authorized_keys
+icacls C:\ProgramData\ssh\administrators_authorized_keys
+```
+
+Na VPS:
+
+```bash
+ssh-keygen -lf /root/.ssh/id_rsa.pub
+```
+
+Os fingerprints `SHA256:...` retornados no Windows e na VPS devem ser iguais. Se forem diferentes, não teste o MCP: corrija primeiro o arquivo de chaves autorizadas.
+
+Na primeira conexão, confirme a impressão digital do host Windows por um canal confiável. Isso grava o host em `~/.ssh/known_hosts`:
 
 ```bash
 ssh -i /root/.ssh/id_rsa \
@@ -374,7 +389,7 @@ ssh -i /root/.ssh/id_rsa \
   danie@100.116.151.102 exit
 ```
 
-Depois que a chave do host for aceita, repita o teste de forma não interativa. Este é o teste que comprova a autenticação VPS → Windows por chave, sem senha:
+Depois, faça o teste não interativo que comprova o login sem senha:
 
 ```bash
 ssh -i /root/.ssh/id_rsa \
@@ -383,13 +398,163 @@ ssh -i /root/.ssh/id_rsa \
   -o PasswordAuthentication=no \
   -o StrictHostKeyChecking=yes \
   danie@100.116.151.102 exit
+
+echo $?
 ```
 
-O comando deve terminar sem solicitar senha e retornar código `0`. Se aparecer `Permission denied (publickey)`, confira o arquivo `authorized_keys`, as ACLs da conta Windows, o usuário informado e se a chave pública foi colada em uma única linha. Não prossiga para a criação do wrapper MCP até este teste funcionar.
+Só prossiga se o resultado for `0`. Se aparecer `Permission denied (publickey)`, confira `C:\ProgramData\ssh\administrators_authorized_keys`, o fingerprint, as ACLs e o bloco `Match Group administrators`.
 
 ---
 
-## 6. Criar o wrapper MCP no gateway
+## 6. Configurar o SSH do Hermes Desktop para o gateway (Windows → VPS)
+
+O Hermes Desktop no Windows faz uma segunda conexão SSH, no sentido oposto:
+
+```text
+Hermes Desktop / Windows 100.116.151.102
+        │
+        │ SSH com chave privada do Windows
+        ▼
+Gateway Linux 100.79.185.92
+```
+
+As duas autenticações são independentes:
+
+| Sentido | Chave privada no cliente | Chave pública autorizada no servidor |
+|---|---|---|
+| VPS → Windows/CUA | `/root/.ssh/id_rsa` na VPS | `C:\ProgramData\ssh\administrators_authorized_keys` no Windows, pois `danie` é administrador |
+| Windows/Hermes Desktop → VPS | `C:\Users\danie\.ssh\hermes_gateway` no Windows | `/root/.ssh/authorized_keys` na VPS |
+
+> O campo **Identity file** do Hermes Desktop recebe uma **chave privada do Windows**. Nunca aponte esse campo para `C:\ProgramData\ssh\administrators_authorized_keys`: esse arquivo contém chaves públicas aceitas pelo Windows quando ele atua como servidor.
+
+### 6.1 Criar uma chave exclusiva no Windows
+
+No PowerShell da conta `danie`:
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.ssh" | Out-Null
+
+ssh-keygen `
+  -t ed25519 `
+  -f "$env:USERPROFILE\.ssh\hermes_gateway" `
+  -C "hermes-desktop@windows-100.116.151.102"
+```
+
+Para uso não interativo pelo Hermes Desktop, deixe a passphrase vazia, salvo se a instalação estiver configurada para usar `ssh-agent`.
+
+Os arquivos criados serão:
+
+```text
+C:\Users\danie\.ssh\hermes_gateway       ← chave privada; permanece no Windows
+C:\Users\danie\.ssh\hermes_gateway.pub   ← chave pública; será instalada na VPS
+```
+
+Exiba e valide a chave pública:
+
+```powershell
+Get-Content "$env:USERPROFILE\.ssh\hermes_gateway.pub"
+ssh-keygen -lf "$env:USERPROFILE\.ssh\hermes_gateway.pub"
+```
+
+### 6.2 Preparar o SSH da VPS e instalar a chave pública do Windows
+
+No Windows, confirme primeiro que a porta SSH da VPS está acessível pela tailnet:
+
+```powershell
+Test-NetConnection 100.79.185.92 -Port 22
+```
+
+Na VPS, confirme que o servidor SSH está ativo e aceita autenticação por chave para `root`:
+
+```bash
+systemctl is-active ssh || systemctl is-active sshd
+ss -ltnp 'sport = :22'
+/usr/sbin/sshd -T | grep -E '^(pubkeyauthentication|permitrootlogin) '
+```
+
+O resultado deve incluir `pubkeyauthentication yes`. Para `root`, `permitrootlogin prohibit-password` aceita login por chave e bloqueia senha; `permitrootlogin yes` também aceita chave. Se aparecer `permitrootlogin no`, use outro usuário Linux permitido ou altere a política conscientemente antes de configurar o Hermes Desktop.
+
+Copie somente a linha iniciada por `ssh-ed25519` para o gateway `100.79.185.92`. Na VPS, como `root`:
+
+```bash
+install -d -m 700 /root/.ssh
+touch /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+nano /root/.ssh/authorized_keys
+# Cole a linha completa de C:\Users\danie\.ssh\hermes_gateway.pub, salve e feche.
+```
+
+Valide o fingerprint na VPS:
+
+```bash
+ssh-keygen -lf /root/.ssh/authorized_keys
+```
+
+O fingerprint da entrada `hermes-desktop@windows-100.116.151.102` deve ser igual ao mostrado no Windows por `ssh-keygen -lf ...hermes_gateway.pub`.
+
+### 6.3 Testar Windows → gateway antes do Hermes Desktop
+
+No PowerShell do Windows:
+
+```powershell
+ssh `
+  -i "$env:USERPROFILE\.ssh\hermes_gateway" `
+  -o IdentitiesOnly=yes `
+  root@100.79.185.92
+```
+
+Depois, faça o teste não interativo:
+
+```powershell
+ssh `
+  -i "$env:USERPROFILE\.ssh\hermes_gateway" `
+  -o IdentitiesOnly=yes `
+  -o BatchMode=yes `
+  -o PasswordAuthentication=no `
+  root@100.79.185.92 "hostname"
+
+$LASTEXITCODE
+```
+
+Só configure o Hermes Desktop quando o comando retornar o hostname do gateway e `$LASTEXITCODE` for `0`, sem solicitar senha.
+
+### 6.4 Configurar o Connect via SSH no Hermes Desktop
+
+Em uma versão do Hermes Desktop que exibe campos separados, use:
+
+| Campo | Valor |
+|---|---|
+| Connection mode | `Connect via SSH` |
+| Host | `100.79.185.92` |
+| User | `root` |
+| Port | `22` |
+| Identity file | `C:\Users\danie\.ssh\hermes_gateway` |
+| Hermes path | deixe em auto-detect inicialmente |
+
+Depois, clique em **Test SSH**. O teste deve passar sem solicitar senha.
+
+Em versões mais recentes, as conexões ficam em **Settings → Gateways → Registered gateways → Add connection → SSH** e podem exibir um único campo **SSH host**. Nesse caso, use:
+
+```text
+root@100.79.185.92:22
+```
+
+Se essa tela não oferecer um campo separado para a chave, configure o cliente OpenSSH do usuário `danie` em `C:\Users\danie\.ssh\config`. Faça o bloco corresponder ao IP usado pelo Hermes Desktop:
+
+```sshconfig
+Host 100.79.185.92
+    HostName 100.79.185.92
+    User root
+    Port 22
+    IdentityFile C:/Users/danie/.ssh/hermes_gateway
+    IdentitiesOnly yes
+```
+
+Teste no PowerShell com `ssh root@100.79.185.92 "hostname"`. Depois mantenha `root@100.79.185.92:22` no campo **SSH host** e clique em **Test**. O OpenSSH lerá o bloco correspondente ao IP e selecionará `C:\Users\danie\.ssh\hermes_gateway`.
+
+---
+
+## 7. Criar o wrapper MCP no gateway
 
 Arquivo criado no VPS: `/root/.hermes/bin/windows-cua-mcp`
 
@@ -418,7 +583,7 @@ bash -n /root/.hermes/bin/windows-cua-mcp
 
 ---
 
-## 7. Registrar o MCP no Hermes
+## 8. Registrar o MCP no Hermes
 
 ```bash
 hermes mcp add windows-cua \
@@ -447,7 +612,7 @@ O Hermes informa que uma **nova sessão** deve ser iniciada para que os tools MC
 
 ---
 
-## 8. Validar o controle remoto do desktop
+## 9. Validar o controle remoto do desktop
 
 Exemplo para confirmar que o processo SSH encaminha chamadas ao daemon da sessão gráfica:
 
@@ -919,6 +1084,13 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 
 ## Checklist operacional
 
+- [ ] Windows pt-BR usa a conta administrativa `danie`.
+- [ ] A chave VPS → Windows está em `C:\ProgramData\ssh\administrators_authorized_keys`, sem `.txt`.
+- [ ] Fingerprint VPS → Windows confere nos dois lados.
+- [ ] Login VPS → Windows retorna código `0` com `BatchMode=yes` e sem senha.
+- [ ] Fingerprint Windows → VPS confere nos dois lados.
+- [ ] Login Windows → VPS retorna código `0` com `BatchMode=yes` e sem senha.
+- [ ] O Hermes Desktop usa `C:\Users\danie\.ssh\hermes_gateway` como chave privada, nunca um arquivo `authorized_keys`.
 - [ ] Sessão gráfica Windows ativa.
 - [ ] `cua-driver status` e `cua-driver doctor` OK.
 - [ ] `list_windows` retorna janelas reais.
@@ -933,6 +1105,9 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 ## Referências
 
 - CUA Windows via SSH: <https://cua.ai/docs/how-to-guides/driver/windows-ssh>
+- Microsoft — autenticação por chave no OpenSSH for Windows: <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement>
+- Microsoft — configuração do OpenSSH Server no Windows: <https://learn.microsoft.com/en-us/windows-server/administration/OpenSSH/openssh-server-configuration>
+- Hermes Desktop — conexões com múltiplas instâncias: <https://hermes-agent.nousresearch.com/docs/user-guide/multi-connection-desktop>
 - Hermes MCP: <https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp>
 - Hermes Computer Use: <https://hermes-agent.nousresearch.com/docs/user-guide/features/computer-use>
 - Microsoft Edge DevTools Protocol: <https://learn.microsoft.com/en-us/microsoft-edge/devtools/protocol/>
