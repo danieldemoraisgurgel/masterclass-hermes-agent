@@ -630,9 +630,116 @@ A validação retornou janelas reais da sessão Windows, incluindo Hermes, Power
 
 A Parte 2 só deve ser configurada depois que a Parte 1 estiver funcional. Ela não substitui o CUA: acrescenta o DevTools Protocol do Edge para operações semânticas de navegador, como navegar, capturar o estado da aba e interagir com elementos da página.
 
-## 1. Iniciar o Edge e publicar o DevTools pelo Tailscale
+## 1. Autorizar o runtime do CUA para usar um perfil existente
 
-### 1.1 Iniciar o Edge com um perfil isolado
+O acesso a um perfil Chromium já iniciado pode expor cookies e sessões autenticadas. Por isso, o Cua Driver exige uma autorização definida **quando o runtime é iniciado**.
+
+Uma autorização escrita no prompt, a aprovação comum de uma chamada MCP ou um argumento enviado pelo agente não substituem esse grant. O modo de permissão fica imutável durante a vida do daemon.
+
+Nesta arquitetura:
+
+```text
+cua-driver serve                                  ← possui o runtime e precisa do grant
+cua-driver mcp --socket \\.\pipe\cua-driver      ← apenas se conecta ao daemon
+```
+
+Portanto, não adicione `--grant existing-profile` ao wrapper `/root/.hermes/bin/windows-cua-mcp`. Adicione-o ao `cua-driver serve` iniciado pelo Scheduled Task do autostart no Windows.
+
+### 1.1 Corrigir o Scheduled Task do autostart
+
+No PowerShell elevado do Windows pt-BR, execute primeiro o autostart normal:
+
+```powershell
+$driver = Get-ChildItem `
+    -Path "$env:USERPROFILE\.cua-driver\packages\releases" `
+    -Filter 'cua-driver.exe' `
+    -Recurse `
+    -File |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1 -ExpandProperty FullName
+
+if (-not $driver) {
+    throw "cua-driver.exe não foi encontrado no perfil $env:USERPROFILE."
+}
+
+& $driver --version
+& $driver autostart enable
+```
+
+Depois, preserve a tarefa e substitua somente sua ação por uma inicialização em modo `standard` com o grant explícito:
+
+```powershell
+$taskName = 'cua-driver-serve'
+$workingDirectory = $env:USERPROFILE
+
+$serveCommand = "Start-Process -FilePath '$driver' " +
+    "-ArgumentList @('serve','--permission-mode','standard','--grant','existing-profile') " +
+    "-WindowStyle Hidden -WorkingDirectory '$workingDirectory'"
+
+$taskArguments = '-NoProfile -WindowStyle Hidden -NonInteractive -Command "' +
+    $serveCommand + '"'
+
+$action = New-ScheduledTaskAction `
+    -Execute 'powershell.exe' `
+    -Argument $taskArguments
+
+Set-ScheduledTask `
+    -TaskName $taskName `
+    -Action $action | Out-Null
+```
+
+Confira a ação persistida antes de reiniciar:
+
+```powershell
+(Get-ScheduledTask -TaskName 'cua-driver-serve').Actions |
+    Format-List Execute, Arguments
+```
+
+A saída deve conter os argumentos:
+
+```text
+serve
+--permission-mode
+standard
+--grant
+existing-profile
+```
+
+Reinicie o daemon para que o novo grant entre em vigor:
+
+```powershell
+& $driver stop
+Start-ScheduledTask -TaskName 'cua-driver-serve'
+Start-Sleep -Seconds 3
+& $driver status
+& $driver doctor
+```
+
+O `status` deve indicar que o daemon está em execução no pipe `\\.\pipe\cua-driver` e em modo `standard`. Um daemon que já estava rodando não recebe o grant retroativamente; ele precisa ser reiniciado.
+
+> Não use `--dangerously-bypass-approvals` apenas para resolver este erro. O modo `standard` com `--grant existing-profile` concede somente a fronteira necessária para anexar um perfil Chromium existente. Para automação não assistida com escopo estrito, use como alternativa avançada o modo `bounded` com um capability manifest revisado e aprovado que declare `kind: existing_profile`, o executável exato do Edge e os tools/origens necessários.
+
+### 1.2 Por que o navegador isolado também foi recusado
+
+O erro sobre não encontrar um executável Chromium protegido e assinado pertence à estratégia `isolated_new`. Nessa estratégia, o CUA só pode lançar uma instalação de Chrome, Edge ou Chromium cuja identidade e localização sejam aceitas pela plataforma. Um executável portátil, copiado para uma pasta do usuário ou não reconhecido como instalação protegida falha de forma segura.
+
+Este tutorial não depende de `isolated_new`. Ele inicia explicitamente o Microsoft Edge instalado em:
+
+```text
+C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe
+```
+
+com um diretório de dados separado. Como esse processo foi iniciado fora do ciclo de vida `isolated_new` do CUA, o binding posterior usa:
+
+```json
+{"strategy":{"kind":"existing_profile"}}
+```
+
+O nome “perfil separado” neste tutorial significa separado do perfil pessoal do Edge; não significa “perfil isolado pertencente ao Cua Driver”.
+
+## 2. Iniciar o Edge separado e publicar o DevTools pelo Tailscale
+
+### 2.1 Iniciar o Edge com um diretório de dados separado
 
 ```powershell
 Start-Process -FilePath 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe' `
@@ -655,7 +762,7 @@ netstat -ano | findstr :9222
 
 O resultado esperado é `127.0.0.1:9222 LISTENING`. Isso é o loopback do Windows.
 
-### 1.2 Publicar a porta somente pelo Tailscale
+### 2.2 Publicar a porta somente pelo Tailscale
 
 O gateway Linux usa `100.79.185.92`; o Windows usa `100.116.151.102`.
 
@@ -706,7 +813,7 @@ Remove-NetFirewallRule -DisplayName "Edge DevTools via Tailscale"
 
 > Não exponha `9222` em `0.0.0.0` sem firewall restrito: DevTools pode controlar abas, cookies e sessões.
 
-### 1.3 Alternativa: túnel SSH
+### 2.3 Alternativa: túnel SSH
 
 ```bash
 ssh -L 9222:127.0.0.1:9222 danie@100.116.151.102
@@ -716,14 +823,15 @@ Use então `http://127.0.0.1:9222/json/list` no gateway.
 
 ---
 
-## 2. Autorizar e fazer binding do navegador
+## 3. Preparar e fazer binding do navegador
 
-1. Execute `list_windows` para obter o PID e `window_id` atuais.
-2. Após autorização explícita, chame `browser_prepare` com `strategy: {kind: existing_profile}`.
-3. No mesmo transporte MCP, chame `get_browser_state`.
-4. Exija `binding_quality: exact`, `mutation_allowed: true` e `endpoint_access_class: existing_profile_approved`.
-5. Use apenas os `target_id` e `tab_id` retornados.
-6. Após cada navegação, descarte refs antigas e obtenha novo snapshot.
+1. Confirme que o daemon foi reiniciado com `--grant existing-profile`.
+2. Execute `list_windows` para obter o PID e `window_id` atuais do Edge.
+3. Após autorização explícita do usuário, chame `browser_prepare` com `strategy: {kind: existing_profile}` e uma `session` estável.
+4. No mesmo transporte MCP e na mesma sessão, chame `get_browser_state`.
+5. Exija `binding_quality: exact`, `mutation_allowed: true` e `endpoint_access_class: existing_profile_approved`.
+6. Use apenas os `target_id` e `tab_id` retornados.
+7. Após cada navegação, descarte refs antigas e obtenha novo snapshot.
 
 A prova de navegação via CDP é:
 
@@ -733,46 +841,46 @@ browser_prepare → get_browser_state → browser_navigate → novo snapshot
 
 ---
 
-## 3. Prompts de validação e uso
+## 4. Prompts de validação e uso
 
-### 3.1 Descoberta inicial pelo `windows-edge-devtools`
+### 4.1 Descoberta inicial pelo `windows-edge-devtools`
 
 ```text
 Use only the MCP server windows-edge-devtools. List the currently open browser pages, select the page whose URL begins with edge://inspect/, and take a screenshot. Report the exact screenshot file path, page index, and URL; do not navigate, click, type, or modify any page.
 ```
 
-### 3.2 Tentativa de iniciar o Edge
+### 4.2 Tentativa de iniciar o Edge
 
 ```text
 pode tentar com o comando "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222 --user-data-dir="C:\Temp\HermesEdgeCDP"
 ```
 
-### 3.3 Usar o MCP CUA
+### 4.3 Usar o MCP CUA
 
 ```text
 tenta usando o mcp do windows-cua
 ```
 
-### 3.4 Validar com a Calculadora antes do Edge
+### 4.4 Validar com a Calculadora antes do Edge
 
 ```text
 tente novamente com o mcp do windows-cua
 antes abra a caculadora pra validar que esta funcionando e depois execute o & "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --remote-debugging-port=9222 --user-data-dir="C:\Temp\HermesEdgeCDP"
 ```
 
-### 3.5 Abrir o Google
+### 4.5 Abrir o Google
 
 ```text
 abra o google.com
 ```
 
-### 3.6 Autorizar o perfil Edge existente
+### 4.6 Autorizar o perfil Edge existente
 
 ```text
-eu autorizo a inspecao DevTools desse perfil isolado.
+Eu autorizo o `browser_prepare` a anexar este perfil separado do Edge como `existing_profile`. O daemon já foi iniciado com `--grant existing-profile`.
 ```
 
-### 3.7 Validar o Endpoint DevTools no navegador aberto
+### 4.7 Validar o Endpoint DevTools no navegador aberto
 
 ```text
 abra agora entao o google.com para validar o Endpoint DevTools via windows cua , com o navegador que ja esta aberto
@@ -780,7 +888,7 @@ abra agora entao o google.com para validar o Endpoint DevTools via windows cua ,
 
 Resultado confirmado: `https://www.google.com/`, binding exato, `mutation_allowed=true` e snapshot pós-navegação válido.
 
-### 3.8 Prompts de uso diário
+### 4.8 Prompts de uso diário
 
 ```text
 Use o MCP windows-cua para abrir a Calculadora no meu Windows.
@@ -801,8 +909,8 @@ Use o MCP windows-cua para abrir o Explorador de Arquivos e navegar até C:\temp
 ## Diagnóstico rápido
 
 - `browser_binding_stale`: redescubra PID e `window_id` com `list_windows`.
-- `browser_consent_required`: solicite autorização explícita.
-- `browser_route_unavailable`: use perfil existente autorizado.
+- `browser_consent_required`: a autorização no chat não basta; reinicie o daemon com `serve --permission-mode standard --grant existing-profile` e repita `browser_prepare`.
+- `browser_route_unavailable`: confirme Edge/Chrome suportado, PID e `window_id` atuais e use `existing_profile` autorizado.
 - `background_unavailable`: tente background uma vez; depois use `foreground` apenas se o CUA recomendar.
 
 ```powershell
@@ -1098,6 +1206,9 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 - [ ] Edge escuta na porta 9222.
 - [ ] Portproxy aponta o IP Tailscale para `127.0.0.1:9222`.
 - [ ] Firewall permite apenas `100.79.185.92`.
+- [ ] Scheduled Task inicia `cua-driver serve --permission-mode standard --grant existing-profile`.
+- [ ] Daemon foi reiniciado depois da alteração do grant.
+- [ ] `browser_prepare` retornou `endpoint_access_class=existing_profile_approved`.
 - [ ] Perfil Edge foi autorizado.
 - [ ] Binding DevTools é `exact` e `mutation_allowed=true`.
 - [ ] URL final foi confirmada por snapshot pós-ação.
@@ -1105,6 +1216,8 @@ See `references/edge-cua-reproduction.md` for the tested sequence and representa
 ## Referências
 
 - CUA Windows via SSH: <https://cua.ai/docs/how-to-guides/driver/windows-ssh>
+- Cua Driver — modos de permissão: <https://cua.ai/docs/reference/cua-driver/permission-modes>
+- Cua Driver — anexar perfil Chromium existente: <https://cua.ai/docs/reference/cua-driver/browser-profile-attachment>
 - Microsoft — autenticação por chave no OpenSSH for Windows: <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement>
 - Microsoft — configuração do OpenSSH Server no Windows: <https://learn.microsoft.com/en-us/windows-server/administration/OpenSSH/openssh-server-configuration>
 - Hermes Desktop — conexões com múltiplas instâncias: <https://hermes-agent.nousresearch.com/docs/user-guide/multi-connection-desktop>
