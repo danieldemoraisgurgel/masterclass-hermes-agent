@@ -97,9 +97,11 @@ $driver = 'C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows
 
 ---
 
-## 4. Habilitar SSH no Windows
+## 4. Habilitar o SSH no Windows
 
-Em um PowerShell elevado (Administrador):
+Nesta etapa, o Windows será o **servidor SSH** e a VPS será o **cliente SSH**. A conexão será iniciada pela VPS através do endereço Tailscale do Windows.
+
+Em um PowerShell elevado (Administrador) no Windows:
 
 ```powershell
 Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
@@ -108,15 +110,45 @@ Set-Service -Name sshd -StartupType Automatic
 Get-NetFirewallRule -Name 'OpenSSH-Server-In-TCP' -ErrorAction SilentlyContinue | Enable-NetFirewallRule
 ```
 
+Confirme que a autenticação por chave pública está habilitada no servidor Windows. Ainda no PowerShell elevado:
+
+```powershell
+$sshdConfig = Join-Path $env:ProgramData 'ssh\sshd_config'
+Select-String -Path $sshdConfig -Pattern '^\s*PubkeyAuthentication\s+yes' -CaseSensitive:$false
+& "$env:WINDIR\System32\OpenSSH\sshd.exe" -t
+Restart-Service sshd
+Get-Service sshd
+```
+
+Se `PubkeyAuthentication yes` estiver ausente ou comentado, abra o arquivo e habilite a opção:
+
+```powershell
+notepad $sshdConfig
+# Garanta que exista esta linha, sem o caractere #:
+# PubkeyAuthentication yes
+& "$env:WINDIR\System32\OpenSSH\sshd.exe" -t
+Restart-Service sshd
+```
+
 No VPS, valide a porta pela tailnet:
 
 ```bash
 timeout 5 bash -c '</dev/tcp/100.116.151.102/22'
 ```
 
+> **Importante:** essa validação confirma apenas que a porta 22 está acessível. A autenticação entre a VPS e o Windows só estará configurada depois que a chave pública for instalada no `authorized_keys` e o teste da seção 5.3 retornar sucesso.
+
 ---
 
-## 5. Criar e autorizar a chave SSH do gateway
+## 5. Configurar a autenticação SSH por chave
+
+Nesta etapa, a VPS e o Desktop Windows passam a se autenticar por chave pública:
+
+1. a VPS cria ou usa o par `/root/.ssh/id_rsa` e mantém a chave privada somente nela;
+2. o conteúdo de `/root/.ssh/id_rsa.pub` é copiado para o Windows;
+3. o Windows instala essa chave no `authorized_keys` correto para a conta usada;
+4. a VPS testa o login com `IdentitiesOnly=yes` e `BatchMode=yes`, sem senha;
+5. somente depois disso o wrapper MCP deve ser criado.
 
 Esta etapa envolve **duas máquinas**. A regra é simples:
 
@@ -125,7 +157,9 @@ Esta etapa envolve **duas máquinas**. A regra é simples:
 | **Gateway Linux/VPS** | Criar e guardar o par de chaves SSH. A chave privada fica somente aqui. |
 | **Windows remoto** | Autorizar somente a chave pública do gateway no OpenSSH. |
 
-> **Nunca copie `~/.ssh/id_rsa` para o Windows.** A chave privada é a credencial do gateway. Apenas o conteúdo de `~/.ssh/id_rsa.pub` deve ser copiado para o Windows.
+> **Nunca copie `/root/.ssh/id_rsa` para o Windows.** A chave privada é a credencial da VPS. Apenas o conteúdo de `/root/.ssh/id_rsa.pub` deve ser copiado para o Windows.
+
+---
 
 ### 5.1 Criar ou validar a chave no gateway Linux/VPS
 
@@ -218,12 +252,28 @@ Os SIDs usados acima são:
 - `S-1-5-32-544`: grupo local Administradores;
 - `S-1-5-18`: SYSTEM.
 
-### Validar do VPS
+### 5.3 Validar a autenticação SSH a partir da VPS
+
+Na primeira conexão, confirme a impressão digital do host Windows e aceite-a somente se ela tiver sido verificada por um canal confiável. Isso grava o host em `~/.ssh/known_hosts` e permite que o wrapper use `StrictHostKeyChecking=yes`:
 
 ```bash
-ssh -i /root/.ssh/id_rsa -o IdentitiesOnly=yes -o BatchMode=yes \
+ssh -i /root/.ssh/id_rsa \
+  -o IdentitiesOnly=yes \
   danie@100.116.151.102 exit
 ```
+
+Depois que a chave do host for aceita, repita o teste de forma não interativa. Este é o teste que comprova a autenticação VPS → Windows por chave, sem senha:
+
+```bash
+ssh -i /root/.ssh/id_rsa \
+  -o IdentitiesOnly=yes \
+  -o BatchMode=yes \
+  -o PasswordAuthentication=no \
+  -o StrictHostKeyChecking=yes \
+  danie@100.116.151.102 exit
+```
+
+O comando deve terminar sem solicitar senha e retornar código `0`. Se aparecer `Permission denied (publickey)`, confira o arquivo `authorized_keys`, as ACLs da conta Windows, o usuário informado e se a chave pública foi colada em uma única linha. Não prossiga para a criação do wrapper MCP até este teste funcionar.
 
 ---
 
