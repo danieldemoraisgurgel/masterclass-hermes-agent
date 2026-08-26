@@ -111,7 +111,7 @@ incompatible daemon: contract version 0.6.0 does not match SDK 0.7.0
 Recrie a tarefa de inicialização automática usando a versão atual do binário:
 
 ```powershell
-$driver = 'C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe'
+$driver = 'C:\Users\danie\.cua-driver\packages\current\cua-driver.exe'
 & $driver autostart disable
 & $driver stop
 & $driver autostart enable
@@ -593,7 +593,7 @@ exec ssh \
   -o ServerAliveInterval=30 \
   -o StrictHostKeyChecking=yes \
   danie@100.116.151.102 \
-  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe\" mcp --socket \"\\.\pipe\cua-driver\""'
+  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\current\cua-driver.exe\" mcp --socket \"\\.\pipe\cua-driver\""'
 ```
 
 Depois:
@@ -603,7 +603,7 @@ chmod 700 /root/.hermes/bin/windows-cua-mcp
 bash -n /root/.hermes/bin/windows-cua-mcp
 ```
 
-> Ajuste o caminho do binário se uma nova versão do CUA instalar em outro diretório.
+> O caminho `C:\\Users\\danie\\.cua-driver\\packages\\current\\cua-driver.exe` é um alias/junction mantido pelo instalador e aponta para a release ativa. Não substitua esse caminho por uma pasta versionada. Para atualizar no futuro, use `cua-driver update --apply`; o wrapper e a tarefa autostart continuarão apontando para `current`.
 
 ---
 
@@ -643,7 +643,7 @@ Exemplo para confirmar que o processo SSH encaminha chamadas ao daemon da sessã
 ```bash
 ssh -i /root/.ssh/id_rsa -o IdentitiesOnly=yes -o BatchMode=yes \
   danie@100.116.151.102 \
-  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe\" call list_windows --socket \"\\.\pipe\cua-driver\""'
+  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\current\cua-driver.exe\" call list_windows --socket \"\\.\pipe\cua-driver\""'
 ```
 
 A validação retornou janelas reais da sessão Windows, incluindo Hermes, PowerShell, Edge, WhatsApp e Explorador de Arquivos.
@@ -1202,7 +1202,7 @@ Foi confirmado:
 ```text
 IP Tailscale: 100.116.151.102
 OpenSSH (sshd): Running
-cua-driver: 0.21.0
+cua-driver: 0.22.1 (versão instalada na validação; confirme com `cua-driver --version`)
 Autostart: registered (running)
 Sessão interativa: console / danie / ID 2 / Ativo
 IP Helper (iphlpsvc): Running
@@ -1303,7 +1303,7 @@ The Windows interactive-session daemon is essential: direct GUI commands from SS
 - Registered MCP server: `windows-cua`
 - Wrapper: `/root/.hermes/bin/windows-cua-mcp`
 - SSH target: `danie@100.116.151.102`
-- Windows CUA executable: `C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe`
+- Windows CUA executable: `C:\Users\danie\.cua-driver\packages\current\cua-driver.exe`
 - Interactive daemon pipe: `\\.\pipe\cua-driver`
 
 The wrapper is a stdio MCP transport. MCP tools are normally discovered only at Hermes startup, so an already-running chat may not expose `mcp_windows_cua_*` tools even if `hermes mcp list` says it is enabled. In that case, use the verified SSH/CLI read-only flow below, or restart the relevant Hermes runtime before expecting MCP tool injection.
@@ -1324,7 +1324,7 @@ Expected: `windows-cua` is enabled.
 ssh -i /root/.ssh/id_rsa -o IdentitiesOnly=yes -o BatchMode=yes \
   -o ConnectTimeout=10 -o StrictHostKeyChecking=yes \
   danie@100.116.151.102 \
-  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe\" call list_windows --socket \"\\.\pipe\cua-driver\""'
+  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\current\cua-driver.exe\" call list_windows --socket \"\\.\pipe\cua-driver\""'
 ```
 
 If it returns `windows: []`, do not claim access. The user must ensure an interactive Windows session exists and the CUA autostart daemon is running.
@@ -1338,7 +1338,7 @@ mkdir -p /cache
 ssh -i /root/.ssh/id_rsa -o IdentitiesOnly=yes -o BatchMode=yes \
   -o ConnectTimeout=10 -o StrictHostKeyChecking=yes \
   danie@100.116.151.102 \
-  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\releases\0.21.0-x86_64-pc-windows-msvc\cua-driver.exe\" call get_desktop_state --socket \"\\.\pipe\cua-driver\""' \
+  'powershell.exe -NoProfile -Command "& \"C:\Users\danie\.cua-driver\packages\current\cua-driver.exe\" call get_desktop_state --socket \"\\.\pipe\cua-driver\""' \
   > /cache/windows-desktop-cua.json
 ```
 
